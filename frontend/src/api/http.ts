@@ -22,6 +22,11 @@ export class ApiError extends Error {
   }
 }
 
+export const SERVER_UNREACHABLE = "The Leuven Go server can't be reached right now. Try again in a moment.";
+
+/** What proxies and hosts answer while the backend is down or starting up. */
+const UNREACHABLE_STATUSES = [502, 503, 504];
+
 export function isApiError(e: unknown, status?: number): e is ApiError {
   return e instanceof ApiError && (status === undefined || e.status === status);
 }
@@ -55,12 +60,18 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const token = readStoredUser()?.token;
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(`${BASE}${path}`, {
-    method: options.method ?? "GET",
-    headers,
-    body,
-    signal: options.signal,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: options.method ?? "GET",
+      headers,
+      body,
+      signal: options.signal,
+    });
+  } catch (e) {
+    if (options.signal?.aborted) throw e;
+    throw new ApiError(0, SERVER_UNREACHABLE);
+  }
 
   if (!res.ok) {
     if (res.status === 401 && token) onUnauthorized?.();
@@ -71,6 +82,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 }
 
 async function readErrorMessage(res: Response): Promise<string> {
+  if (UNREACHABLE_STATUSES.includes(res.status)) return SERVER_UNREACHABLE;
   try {
     const body = (await res.json()) as { message?: string };
     if (body.message) return body.message;

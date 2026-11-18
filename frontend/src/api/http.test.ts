@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, errorMessage, isApiError, request, setUnauthorizedListener } from "./http";
+import { ApiError, SERVER_UNREACHABLE, errorMessage, isApiError, request, setUnauthorizedListener } from "./http";
 import { writeStoredUser } from "../lib/authStorage";
 
 function jsonResponse(status: number, body: unknown) {
@@ -50,11 +50,33 @@ describe("request", () => {
     expect(errorMessage(err)).toBe("Email already registered");
   });
 
-  it("falls back to a generic message for non-JSON errors", async () => {
-    fetchMock.mockResolvedValue(new Response("oops", { status: 502 }));
+  it("falls back to the status for non-JSON errors", async () => {
+    fetchMock.mockResolvedValue(new Response("oops", { status: 500 }));
     const err = await request("/x").catch((e: unknown) => e);
-    expect(isApiError(err, 502)).toBe(true);
-    expect(errorMessage(err)).toMatch(/502/);
+    expect(isApiError(err, 500)).toBe(true);
+    expect(errorMessage(err)).toMatch(/500/);
+  });
+
+  it.each([502, 503, 504])("explains a %i from the proxy as the server being unreachable", async (status) => {
+    fetchMock.mockResolvedValue(new Response("Bad Gateway", { status }));
+    const err = await request("/x").catch((e: unknown) => e);
+    expect(isApiError(err, status)).toBe(true);
+    expect(errorMessage(err)).toBe(SERVER_UNREACHABLE);
+  });
+
+  it("explains a failed connection as the server being unreachable", async () => {
+    fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
+    const err = await request("/x").catch((e: unknown) => e);
+    expect(isApiError(err, 0)).toBe(true);
+    expect(errorMessage(err)).toBe(SERVER_UNREACHABLE);
+  });
+
+  it("lets an abort through untouched", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    fetchMock.mockRejectedValue(new DOMException("Aborted", "AbortError"));
+    const err = await request("/x", { signal: controller.signal }).catch((e: unknown) => e);
+    expect(err).not.toBeInstanceOf(ApiError);
   });
 
   it("notifies the unauthorized listener only for authenticated calls", async () => {
