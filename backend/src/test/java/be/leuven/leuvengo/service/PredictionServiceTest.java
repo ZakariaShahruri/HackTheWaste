@@ -54,7 +54,7 @@ class PredictionServiceTest {
 
     @Test
     void sendsAPlainHttp11RequestAndParsesTheGrid() {
-        var points = predictions.predictGrid(LocalDateTime.of(2026, 11, 18, 12, 0), 5);
+        var points = predictions.predictGrid(LocalDateTime.of(2026, 11, 18, 12, 0), 5).orElseThrow();
 
         assertThat(upgradeHeader.get()).as("uvicorn drops the body of h2c upgrade requests").isNull();
         assertThat(requestBody.get()).contains("\"lat_steps\":5", "\"time\":\"2026-11-18T12:00:00\"");
@@ -62,7 +62,7 @@ class PredictionServiceTest {
     }
 
     @Test
-    void anUnreachableServiceGivesAnEmptyGrid() {
+    void anUnreachableServiceMeansNoPrediction() {
         server.stop(0);
         assertThat(predictions.predictGrid(LocalDateTime.now(), 5)).isEmpty();
     }
