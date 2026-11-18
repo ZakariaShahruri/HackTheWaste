@@ -1,64 +1,95 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { errorMessage } from "../api/http";
 
 export interface AsyncState<T> {
+  /** Latest successful result. Kept while a newer request is in flight. */
   data: T | null;
+  /** True until the first result (or error) for the current key arrives. */
   loading: boolean;
   error: string | null;
+  /** When `data` was last refreshed successfully. */
+  lastUpdated: Date | null;
   refetch: () => void;
 }
 
 export interface UseApiOptions {
-  /** If set, re-runs the loader every N ms (e.g. live-polling for new
-   *  WhatsApp / in-app reports). Subsequent fetches don't toggle `loading`. */
+  /** Re-runs the loader when this value changes (e.g. a selected filter). */
+  key?: unknown;
+  /** Re-runs the loader every N ms while the tab is visible. */
   pollMs?: number;
 }
 
-export function useApi<T>(
-  loader: () => Promise<T>,
-  deps: unknown[] = [],
-  options: UseApiOptions = {},
-): AsyncState<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const cancelledRef = useRef(false);
-  const hasLoadedRef = useRef(false);
+type Loader<T> = (signal: AbortSignal) => Promise<T>;
 
-  const fetchOnce = useCallback(async () => {
-    if (!hasLoadedRef.current) setLoading(true);
+interface Snapshot<T> {
+  key: unknown;
+  data: T | null;
+  error: string | null;
+  lastUpdated: Date | null;
+}
+
+const NOTHING_LOADED = Symbol("nothing-loaded");
+
+/**
+ * Fetches data with a loader, optionally polling. Each new request aborts the
+ * previous one, and responses that arrive out of order are dropped, so the UI
+ * never flips back to stale data.
+ */
+export function useApi<T>(loader: Loader<T>, options: UseApiOptions = {}): AsyncState<T> {
+  const { key, pollMs } = options;
+
+  const loaderRef = useRef(loader);
+  useLayoutEffect(() => {
+    loaderRef.current = loader;
+  });
+
+  const [snapshot, setSnapshot] = useState<Snapshot<T>>({
+    key: NOTHING_LOADED,
+    data: null,
+    error: null,
+    lastUpdated: null,
+  });
+
+  const sequenceRef = useRef(0);
+  const controllerRef = useRef<AbortController | null>(null);
+
+  const run = useCallback(async (forKey: unknown) => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    const sequence = ++sequenceRef.current;
+
     try {
-      const r = await loader();
-      if (!cancelledRef.current) {
-        setData(r);
-        setError(null);
-      }
+      const data = await loaderRef.current(controller.signal);
+      if (sequence !== sequenceRef.current) return;
+      setSnapshot({ key: forKey, data, error: null, lastUpdated: new Date() });
     } catch (e) {
-      if (!cancelledRef.current)
-        setError(e instanceof Error ? e.message : "Unknown error");
-    } finally {
-      if (!cancelledRef.current) {
-        setLoading(false);
-        hasLoadedRef.current = true;
-      }
+      if (controller.signal.aborted || sequence !== sequenceRef.current) return;
+      setSnapshot((prev) => ({ ...prev, key: forKey, error: errorMessage(e) }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, []);
 
   useEffect(() => {
-    cancelledRef.current = false;
-    hasLoadedRef.current = false;
-    void fetchOnce();
-    let timer: ReturnType<typeof setInterval> | null = null;
-    if (options.pollMs && options.pollMs > 0) {
-      timer = setInterval(() => {
-        if (document.visibilityState === "visible") void fetchOnce();
-      }, options.pollMs);
-    }
+    void run(key);
+    const timer =
+      pollMs && pollMs > 0
+        ? setInterval(() => {
+            if (document.visibilityState === "visible") void run(key);
+          }, pollMs)
+        : undefined;
     return () => {
-      cancelledRef.current = true;
-      if (timer) clearInterval(timer);
+      clearInterval(timer);
+      controllerRef.current?.abort();
     };
-  }, [fetchOnce, options.pollMs]);
+  }, [run, key, pollMs]);
 
-  return { data, loading, error, refetch: () => void fetchOnce() };
+  const refetch = useCallback(() => void run(key), [run, key]);
+
+  return {
+    data: snapshot.data,
+    loading: !Object.is(snapshot.key, key),
+    error: Object.is(snapshot.key, key) ? snapshot.error : null,
+    lastUpdated: snapshot.lastUpdated,
+    refetch,
+  };
 }

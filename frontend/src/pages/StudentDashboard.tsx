@@ -7,10 +7,10 @@ import { ScoreChip } from "../components/ScoreChip";
 
 export default function StudentDashboard() {
   const POLL = { pollMs: 8000 };
-  const faculties = useApi(() => api.faculties(), [], POLL);
-  const segments = useApi(() => api.segments(), [], POLL);
-  const hotspots = useApi(() => api.hotspots(), [], POLL);
-  const leaderboard = useApi(() => api.leaderboard(), [], POLL);
+  const faculties = useApi((signal) => api.faculties(signal), POLL);
+  const segments = useApi((signal) => api.segments(signal), POLL);
+  const hotspots = useApi((signal) => api.hotspots(signal), POLL);
+  const leaderboard = useApi((signal) => api.leaderboard(signal), POLL);
   const [selected, setSelected] = useState<string | undefined>(undefined);
 
   const myFaculty = selected

@@ -1,70 +1,76 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AuthUser } from "../api/types";
 import { api } from "../api/client";
-
-interface AuthContextType {
-  user: AuthUser | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, facultyShortCode?: string) => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-const AuthContext = createContext<AuthContextType | null>(null);
-
-const STORAGE_KEY = "auth_user";
-
-function loadStored(): AuthUser | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
-  } catch {
-    return null;
-  }
-}
+import { isApiError, setUnauthorizedListener } from "../api/http";
+import { readStoredUser, writeStoredUser } from "../lib/authStorage";
+import { AuthContext } from "./auth";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(loadStored);
+  const [user, setUser] = useState<AuthUser | null>(readStoredUser);
   const [loading, setLoading] = useState(false);
 
-  function persist(u: AuthUser | null) {
-    if (u) localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
-    else localStorage.removeItem(STORAGE_KEY);
+  const persist = useCallback((u: AuthUser | null) => {
+    writeStoredUser(u);
     setUser(u);
-  }
+  }, []);
 
-  async function login(email: string, password: string) {
-    setLoading(true);
-    try {
-      persist(await api.login(email, password));
-    } finally {
-      setLoading(false);
-    }
-  }
+  // Any 401 on an authenticated call means the session is gone server-side.
+  useEffect(() => {
+    setUnauthorizedListener(() => persist(null));
+    return () => setUnauthorizedListener(null);
+  }, [persist]);
 
-  async function register(email: string, password: string, facultyShortCode?: string) {
-    setLoading(true);
-    try {
-      persist(await api.register(email, password, facultyShortCode));
-    } finally {
-      setLoading(false);
-    }
-  }
+  // Re-validate a stored session once on load so a stale token doesn't
+  // masquerade as being logged in.
+  useEffect(() => {
+    if (!readStoredUser()) return;
+    const controller = new AbortController();
+    api
+      .me(controller.signal)
+      .then((fresh) => persist({ ...fresh, token: readStoredUser()?.token ?? fresh.token }))
+      .catch((e: unknown) => {
+        if (isApiError(e, 401)) persist(null);
+      });
+    return () => controller.abort();
+  }, [persist]);
 
-  async function logout() {
-    try { await api.logout(); } catch { /* ignore if token already gone */ }
-    persist(null);
-  }
-
-  return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
-      {children}
-    </AuthContext.Provider>
+  const login = useCallback(
+    async (email: string, password: string) => {
+      setLoading(true);
+      try {
+        persist(await api.login(email, password));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [persist],
   );
-}
 
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
-  return ctx;
+  const register = useCallback(
+    async (email: string, password: string, facultyShortCode?: string) => {
+      setLoading(true);
+      try {
+        persist(await api.register(email, password, facultyShortCode));
+      } finally {
+        setLoading(false);
+      }
+    },
+    [persist],
+  );
+
+  const logout = useCallback(async () => {
+    try {
+      await api.logout();
+    } catch {
+      // token may already be invalid — clearing locally is what matters
+    }
+    persist(null);
+  }, [persist]);
+
+  const value = useMemo(
+    () => ({ user, loading, login, register, logout }),
+    [user, loading, login, register, logout],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

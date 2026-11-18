@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import { useApi } from "../hooks/useApi";
 
 export default function LeaderboardPage() {
-  const board = useApi(() => api.leaderboard(), []);
+  const board = useApi((signal) => api.leaderboard(signal));
   const max = Math.max(1, ...(board.data ?? []).map((e) => e.points));
 
   return (

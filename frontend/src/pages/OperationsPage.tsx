@@ -5,8 +5,8 @@ import { StatusTag } from "../components/StatusTag";
 import { HotspotMap } from "../components/Map/HotspotMap";
 
 export default function OperationsPage() {
-  const orders = useApi(() => api.workOrders(), []);
-  const hotspots = useApi(() => api.activeHotspots(), []);
+  const orders = useApi((signal) => api.workOrders(signal));
+  const hotspots = useApi((signal) => api.activeHotspots(signal));
   const [busyId, setBusyId] = useState<number | null>(null);
 
   const complete = async (id: number) => {

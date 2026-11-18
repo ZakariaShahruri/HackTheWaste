@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { useApi } from "../hooks/useApi";
 import { api } from "../api/client";
@@ -8,19 +8,13 @@ import type { TrashPhotoDto } from "../api/types";
 
 export default function LandingPage() {
   const POLL = { pollMs: 10000 };
-  const { data: stats } = useApi(() => api.stats(), [], POLL);
-  const { data: leaderboard } = useApi(() => api.leaderboard(), [], POLL);
+  const { data: stats } = useApi((signal) => api.stats(signal), POLL);
+  const { data: leaderboard } = useApi((signal) => api.leaderboard(signal), POLL);
   const top = leaderboard?.[0];
 
-  const [feedPhotos, setFeedPhotos] = useState<TrashPhotoDto[]>([]);
-  const [feedLoading, setFeedLoading] = useState(true);
-
-  useEffect(() => {
-    api.feed(0, 6).then((r) => {
-      setFeedPhotos(r.content);
-      setFeedLoading(false);
-    }).catch(() => setFeedLoading(false));
-  }, []);
+  const feed = useApi((signal) => api.feed(0, 6, undefined, signal));
+  const feedPhotos = feed.data?.content ?? [];
+  const feedLoading = feed.loading;
 
   return (
     <div className="container landing">

@@ -1,6 +1,6 @@
+import { request } from "./http";
 import type {
   AuthUser,
-  CityConfig,
   FacultyDto,
   FeedPage,
   HotspotDto,
@@ -12,74 +12,37 @@ import type {
   WorkOrderDto,
 } from "./types";
 
-const BASE = (import.meta.env.VITE_API_BASE_URL ?? "") + "/api";
-const AUTH_KEY = "auth_user";
-
-function storedToken(): string | null {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser).token : null;
-  } catch {
-    return null;
-  }
-}
-
-async function request<T>(
-  path: string,
-  init?: RequestInit & { json?: unknown },
-): Promise<T> {
-  const headers = new Headers(init?.headers ?? {});
-  let body: BodyInit | undefined = init?.body as BodyInit | undefined;
-  if (init?.json !== undefined) {
-    headers.set("Content-Type", "application/json");
-    body = JSON.stringify(init.json);
-  }
-  const token = storedToken();
-  if (token) headers.set("Authorization", `Bearer ${token}`);
-  const res = await fetch(`${BASE}${path}`, { ...init, headers, body });
-  if (!res.ok) {
-    let message = `${res.status} ${res.statusText}`;
-    try {
-      const err = (await res.json()) as { message?: string };
-      if (err.message) message = err.message;
-    } catch { /* use default */ }
-    throw new Error(message);
-  }
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
-}
+type Signal = AbortSignal | undefined;
 
 export const api = {
   register: (email: string, password: string, facultyShortCode?: string) =>
-    request<AuthUser>("/auth/register", { method: "POST", json: { email, password, facultyShortCode, consentGiven: true } }),
+    request<AuthUser>("/auth/register", {
+      method: "POST",
+      json: { email, password, facultyShortCode, consentGiven: true },
+    }),
   login: (email: string, password: string) =>
     request<AuthUser>("/auth/login", { method: "POST", json: { email, password } }),
-  me: () => request<AuthUser>("/auth/me"),
+  me: (signal?: Signal) => request<AuthUser>("/auth/me", { signal }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
 
-  city: () => request<CityConfig>("/stats/city"),
-  stats: () => request<StatsDto>("/stats"),
-  hotspots: () => request<HotspotDto[]>("/hotspots"),
-  activeHotspots: () => request<HotspotDto[]>("/hotspots/active"),
-  segments: () => request<StreetSegmentDto[]>("/segments"),
-  faculties: () => request<FacultyDto[]>("/faculties"),
-  leaderboard: () => request<LeaderboardEntry[]>("/leaderboard"),
-  workOrders: () => request<WorkOrderDto[]>("/work-orders"),
+  stats: (signal?: Signal) => request<StatsDto>("/stats", { signal }),
+  hotspots: (signal?: Signal) => request<HotspotDto[]>("/hotspots", { signal }),
+  activeHotspots: (signal?: Signal) => request<HotspotDto[]>("/hotspots/active", { signal }),
+  segments: (signal?: Signal) => request<StreetSegmentDto[]>("/segments", { signal }),
+  faculties: (signal?: Signal) => request<FacultyDto[]>("/faculties", { signal }),
+  leaderboard: (signal?: Signal) => request<LeaderboardEntry[]>("/leaderboard", { signal }),
+  workOrders: (signal?: Signal) => request<WorkOrderDto[]>("/work-orders", { signal }),
   completeWorkOrder: (id: number) =>
     request<WorkOrderDto>(`/work-orders/${id}/complete`, { method: "POST" }),
-  dispatchWorkOrder: (hotspotId: number) =>
-    request<WorkOrderDto>(`/work-orders/dispatch/${hotspotId}`, {
-      method: "POST",
-    }),
-  rewards: () => request<RewardItemDto[]>("/rewards"),
-  feed: (page = 0, size = 12, clan?: string) => {
+  rewards: (signal?: Signal) => request<RewardItemDto[]>("/rewards", { signal }),
+  feed: (page = 0, size = 12, clan?: string, signal?: Signal) => {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
     if (clan) params.set("clan", clan);
-    return request<FeedPage>(`/feed?${params}`);
+    return request<FeedPage>(`/feed?${params}`, { signal });
   },
 
-  predictGrid: (at: string, steps = 30) => {
+  predictGrid: (at: string, steps = 30, signal?: Signal) => {
     const params = new URLSearchParams({ at, steps: String(steps) });
-    return request<PredictPoint[]>(`/predictions/grid?${params}`);
+    return request<PredictPoint[]>(`/predictions/grid?${params}`, { signal });
   },
 };

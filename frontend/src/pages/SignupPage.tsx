@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/auth";
+import { errorMessage, isApiError } from "../api/http";
 import { useApi } from "../hooks/useApi";
 import { api } from "../api/client";
 
 export default function SignupPage() {
   const { register, loading } = useAuth();
   const navigate = useNavigate();
-  const { data: faculties } = useApi(() => api.faculties(), []);
+  const { data: faculties } = useApi((signal) => api.faculties(signal));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,12 +26,9 @@ export default function SignupPage() {
     }
     try {
       await register(email, password, clan);
-      navigate(-1);
+      navigate("/student", { replace: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Sign up failed";
-      if (msg.startsWith("409")) setError("Email is already registered");
-      else if (msg.startsWith("400")) setError(msg.replace(/^\d{3}\s\w+\s*/, ""));
-      else setError(msg);
+      setError(isApiError(err, 409) ? "Email is already registered" : errorMessage(err, "Sign up failed"));
     }
   }
 

@@ -87,13 +87,6 @@ export interface StatsDto {
   topHotspots: HotspotDto[];
 }
 
-export interface CityConfig {
-  name: string;
-  centerLat: number;
-  centerLng: number;
-  clusterRadiusM: number;
-  workOrderThreshold: number;
-}
 
 export interface TrashPhotoDto {
   id: number;

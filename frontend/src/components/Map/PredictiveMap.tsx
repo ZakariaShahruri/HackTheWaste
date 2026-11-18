@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useApi } from "../../hooks/useApi";
 import { MapContainer, TileLayer, ScaleControl } from "react-leaflet";
 import "./leafletSetup";
 import {
@@ -30,47 +31,29 @@ interface Props {
   height?: number;
 }
 
+async function fetchPredictionGrid(day: number, hour: number, signal: AbortSignal) {
+  const res = await fetch(`${ML_URL}/predict/grid`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ time: toIso(day, hour), lat_steps: 35, lng_steps: 35 }),
+    signal,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = (await res.json()) as { points?: PredictPoint[] };
+  return data.points ?? [];
+}
+
 export function PredictiveMap({ height = 540 }: Props) {
   const today = (new Date().getDay() + 6) % 7;
   const [day, setDay]   = useState(today);
   const [hour, setHour] = useState(new Date().getHours());
-  const [points, setPoints] = useState<PredictPoint[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [mlOffline, setMlOffline] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setMlOffline(false);
-
-    fetch(`${ML_URL}/predict/grid`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        time: toIso(day, hour),
-        lat_steps: 35,
-        lng_steps: 35,
-      }),
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data: { points: PredictPoint[] }) => {
-        if (!cancelled) {
-          setPoints(data.points ?? []);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setMlOffline(true);
-          setLoading(false);
-        }
-      });
-
-    return () => { cancelled = true; };
-  }, [day, hour]);
+  const prediction = useApi(
+    (signal) => fetchPredictionGrid(day, hour, signal),
+    { key: `${day}:${hour}` },
+  );
+  const points = prediction.data ?? [];
+  const loading = prediction.loading;
+  const mlOffline = prediction.error !== null;
 
   const peak = points.length ? Math.max(...points.map((p) => p.likelihood)) : 0;
   const peakPct = Math.round(peak * 100);

@@ -10,10 +10,10 @@ import { StatusTag } from "../components/StatusTag";
 
 export default function ProfessionalDashboard() {
   const POLL = { pollMs: 5000 };
-  const stats = useApi(() => api.stats(), [], POLL);
-  const hotspots = useApi(() => api.hotspots(), [], POLL);
-  const segments = useApi(() => api.segments(), [], POLL);
-  const orders = useApi(() => api.workOrders(), [], POLL);
+  const stats = useApi((signal) => api.stats(signal), POLL);
+  const hotspots = useApi((signal) => api.hotspots(signal), POLL);
+  const segments = useApi((signal) => api.segments(signal), POLL);
+  const orders = useApi((signal) => api.workOrders(signal), POLL);
   const [district, setDistrict] = useState<string>("ALL");
   const [mapMode, setMapMode] = useState<"live" | "predictive">("predictive");
 

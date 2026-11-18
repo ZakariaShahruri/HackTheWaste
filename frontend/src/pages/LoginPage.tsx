@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../context/auth";
+import { errorMessage, isApiError } from "../api/http";
 
 export default function LoginPage() {
   const { login, loading } = useAuth();
@@ -18,9 +19,7 @@ export default function LoginPage() {
       await login(email, password);
       navigate(from, { replace: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Login failed";
-      if (msg.startsWith("401")) setError("Invalid email or password");
-      else setError(msg);
+      setError(isApiError(err, 401) ? "Invalid email or password" : errorMessage(err, "Login failed"));
     }
   }
 

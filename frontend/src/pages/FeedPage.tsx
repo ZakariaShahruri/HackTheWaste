@@ -1,43 +1,16 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import { errorMessage } from "../api/http";
 import { useApi } from "../hooks/useApi";
 import { ScoreChip } from "../components/ScoreChip";
 import type { TrashPhotoDto } from "../api/types";
 
+const PAGE_SIZE = 12;
+
 export default function FeedPage() {
-  const faculties = useApi(() => api.faculties(), []);
-  const [photos, setPhotos] = useState<TrashPhotoDto[]>([]);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const faculties = useApi((signal) => api.faculties(signal));
   const [clan, setClan] = useState<string | undefined>(undefined);
-  const [total, setTotal] = useState(0);
-
-  async function loadPage(p: number, selectedClan?: string) {
-    setLoading(true);
-    try {
-      const result = await api.feed(p, 12, selectedClan);
-      setPhotos((prev) => (p === 0 ? result.content : [...prev, ...result.content]));
-      setHasMore(!result.last);
-      setTotal(result.totalElements);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Reload from page 0 whenever the clan filter changes
-  useEffect(() => {
-    setPage(0);
-    setPhotos([]);
-    void loadPage(0, clan);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clan]);
-
-  function loadMore() {
-    const next = page + 1;
-    setPage(next);
-    void loadPage(next, clan);
-  }
+  const [total, setTotal] = useState<number | null>(null);
 
   return (
     <div className="container" style={{ maxWidth: 1100 }}>
@@ -45,7 +18,7 @@ export default function FeedPage() {
         <div>
           <h1 style={{ fontSize: 28 }}>Leuven Feed</h1>
           <div className="muted" style={{ marginTop: 4, fontSize: 14 }}>
-            {total} trash reports captured across Leuven
+            {total ?? "—"} trash reports captured across Leuven
           </div>
         </div>
       </div>
@@ -80,28 +53,75 @@ export default function FeedPage() {
         ))}
       </div>
 
-      {/* Grid */}
-      {photos.length === 0 && !loading ? (
-        <div className="card" style={{ textAlign: "center", padding: 48, color: "var(--fg-soft)" }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🗑</div>
-          <div style={{ fontWeight: 600 }}>No reports yet for this filter</div>
-          <div style={{ fontSize: 14, marginTop: 6 }}>
-            Submit a report via WhatsApp or the Report page to see photos here.
-          </div>
-        </div>
-      ) : (
-        <div className="feed-grid">
-          {photos.map((p) => (
-            <PhotoCard key={p.id} photo={p} />
-          ))}
-          {loading &&
-            Array.from({ length: 6 }).map((_, i) => (
-              <div key={`sk-${i}`} className="feed-card feed-skeleton" />
-            ))}
-        </div>
-      )}
+      {/* Remounting per clan resets paging state without effects juggling it. */}
+      <FeedResults key={clan ?? "all"} clan={clan} onTotal={setTotal} />
+    </div>
+  );
+}
 
-      {/* Load more */}
+function FeedResults({ clan, onTotal }: { clan?: string; onTotal: (n: number) => void }) {
+  const [pages, setPages] = useState(1);
+  const [photos, setPhotos] = useState<TrashPhotoDto[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    api
+      .feed(pages - 1, PAGE_SIZE, clan, controller.signal)
+      .then((result) => {
+        setPhotos((prev) => [...prev, ...result.content]);
+        setHasMore(!result.last);
+        onTotal(result.totalElements);
+        setError(null);
+      })
+      .catch((e: unknown) => {
+        if (!controller.signal.aborted) setError(errorMessage(e, "Could not load the feed"));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [pages, clan, onTotal]);
+
+  function loadMore() {
+    setLoading(true);
+    setPages((n) => n + 1);
+  }
+
+  if (error && photos.length === 0) {
+    return (
+      <div className="card" style={{ textAlign: "center", padding: 48, color: "var(--fg-soft)" }}>
+        <div style={{ fontWeight: 600 }}>{error}</div>
+      </div>
+    );
+  }
+
+  if (photos.length === 0 && !loading) {
+    return (
+      <div className="card" style={{ textAlign: "center", padding: 48, color: "var(--fg-soft)" }}>
+        <div style={{ fontSize: 48, marginBottom: 12 }}>🗑</div>
+        <div style={{ fontWeight: 600 }}>No reports yet for this filter</div>
+        <div style={{ fontSize: 14, marginTop: 6 }}>
+          Send a report via WhatsApp or try it in your browser to see photos here.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="feed-grid">
+        {photos.map((p) => (
+          <PhotoCard key={p.id} photo={p} />
+        ))}
+        {loading &&
+          Array.from({ length: 6 }).map((_, i) => (
+            <div key={`sk-${i}`} className="feed-card feed-skeleton" />
+          ))}
+      </div>
+
       {hasMore && !loading && photos.length > 0 && (
         <div style={{ textAlign: "center", marginTop: 32 }}>
           <button className="btn btn-ghost" onClick={loadMore}>
@@ -109,7 +129,7 @@ export default function FeedPage() {
           </button>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

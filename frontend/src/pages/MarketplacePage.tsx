@@ -4,8 +4,8 @@ import { api } from "../api/client";
 import { useApi } from "../hooks/useApi";
 
 export default function MarketplacePage() {
-  const rewards = useApi(() => api.rewards(), []);
-  const board = useApi(() => api.leaderboard(), []);
+  const rewards = useApi((signal) => api.rewards(signal));
+  const board = useApi((signal) => api.leaderboard(signal));
   const [category, setCategory] = useState("ALL");
 
   const categories = useMemo(() => {
