@@ -191,6 +191,7 @@ social preview image URL; Vercel builds use the production URL instead (see
 | POST   | `/api/work-orders/dispatch/{hotspotId}` | Escalate a hotspot by hand                   |
 | POST   | `/api/auth/register`, `/login`, `/logout` | Accounts                               |
 | GET    | `/api/auth/me`                      | The logged-in user, including their points       |
+| GET    | `/actuator/health`                  | Health check (app and database), no details      |
 
 Errors always come back as the same JSON shape (`status`, `error`, `message`,
 `path`, `timestamp`), never as stack traces.

@@ -26,6 +26,13 @@ spring:
       max-file-size: 5MB
       max-request-size: 6MB
 
+management:
+  endpoints:
+    web:
+      exposure:
+        # only the health check Railway and docker compose poll
+        include: health
+
 leuvengo:
   traffic:
     # meters - reports within this radius are merged into the same hotspot
