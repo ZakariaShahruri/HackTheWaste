@@ -1,6 +1,9 @@
 [build]
-builder = "nixpacks"
-buildCommand = "mvn package -DskipTests"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "java -jar target/*.jar"
+healthcheckPath = "/actuator/health"
+# Flyway and the demo seeder run before the app reports healthy
+healthcheckTimeout = 180
+restartPolicyType = "ON_FAILURE"

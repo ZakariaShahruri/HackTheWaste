@@ -109,6 +109,7 @@ flowchart LR
 | `ml/`       | Python 3.13, FastAPI, scikit-learn                                         |
 | AI          | Google Gemini (`gemini-2.5-flash-lite` by default)                         |
 | Messaging   | Twilio WhatsApp                                                            |
+| Hosting     | Vercel (frontend); Railway (backend, ML, Postgres), both built from their Dockerfiles |
 
 ## Running it locally
 
