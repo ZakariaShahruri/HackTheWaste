@@ -1,53 +1,46 @@
 import { useState } from "react";
-import { useApi } from "../../hooks/useApi";
-import { MapContainer, ScaleControl } from "react-leaflet";
-import "./leafletSetup";
-import {
-  LEUVEN_BOUNDS,
-  LEUVEN_CENTER,
-  LEUVEN_MAX_ZOOM,
-  LEUVEN_MIN_ZOOM,
-} from "./leafletSetup";
-import { PredictiveHeatmapLayer } from "./PredictiveHeatmapLayer";
 import { api } from "../../api/client";
-import { BaseTiles } from "./BaseTiles";
+import { useApi } from "../../hooks/useApi";
+import { useDebounced } from "../../hooks/useDebounced";
+import { MapBase } from "./MapBase";
+import { PredictiveHeatmapLayer } from "./PredictiveHeatmapLayer";
+import { LIKELIHOOD_BANDS, cssColor, likelihoodColor } from "../../lib/heatmap";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const GRID_STEPS = 35;
+// ~110 m cells over the forecast area; the backend allows up to 60.
+const GRID_STEPS = 50;
+// Dragging the hour slider shouldn't fire a forecast for every hour it passes.
+const SCRUB_DEBOUNCE_MS = 250;
 
-interface Props {
-  height?: number;
-}
+export function PredictiveMap() {
+  const now = new Date();
+  const [day, setDay] = useState((now.getDay() + 6) % 7);
+  const [hour, setHour] = useState(now.getHours());
+  const selected = `${day}:${hour}`;
+  const query = useDebounced(selected, SCRUB_DEBOUNCE_MS);
 
-export function PredictiveMap({ height = 540 }: Props) {
-  const today = (new Date().getDay() + 6) % 7;
-  const [day, setDay]   = useState(today);
-  const [hour, setHour] = useState(new Date().getHours());
   const prediction = useApi(
-    (signal) => api.predictGrid(day, hour, GRID_STEPS, signal),
-    { key: `${day}:${hour}` },
+    (signal) => {
+      const [qDay, qHour] = query.split(":").map(Number);
+      return api.predictGrid(qDay, qHour, GRID_STEPS, signal);
+    },
+    { key: query },
   );
   const points = prediction.data?.points ?? [];
-  const loading = prediction.loading;
-  const mlOffline = prediction.error !== null || prediction.data?.available === false;
-
+  const offline = prediction.error !== null || prediction.data?.available === false;
+  const pending = prediction.loading || query !== selected;
   const peak = points.length ? Math.max(...points.map((p) => p.likelihood)) : 0;
-  const peakPct = Math.round(peak * 100);
-  const peakColor =
-    peak > 0.65 ? "#dc2626"
-    : peak > 0.4 ? "#f97316"
-    : peak > 0.2 ? "#eab308"
-    : "#22c55e";
 
   return (
     <div>
-      {/* Time scrubber */}
       <div className="predictive-controls">
-        <div className="predictive-day-row">
+        <div className="predictive-day-row" role="group" aria-label="Day of the week">
           {DAYS.map((d, i) => (
             <button
               key={d}
+              type="button"
               className={`predictive-day-btn${day === i ? " active" : ""}`}
+              aria-pressed={day === i}
               onClick={() => setDay(i)}
             >
               {d}
@@ -56,10 +49,11 @@ export function PredictiveMap({ height = 540 }: Props) {
         </div>
 
         <div className="predictive-hour-row">
-          <span className="predictive-hour-label">
+          <label htmlFor="forecast-hour" className="predictive-hour-label">
             {String(hour).padStart(2, "0")}:00
-          </span>
+          </label>
           <input
+            id="forecast-hour"
             type="range"
             min={0}
             max={23}
@@ -67,58 +61,37 @@ export function PredictiveMap({ height = 540 }: Props) {
             value={hour}
             onChange={(e) => setHour(Number(e.target.value))}
             className="predictive-slider"
+            aria-label="Hour of the day"
           />
-          <span className="predictive-status">
-            {loading ? (
+          <span className="predictive-status" aria-live="polite">
+            {offline ? (
+              <span className="predictive-offline">Forecast unavailable right now</span>
+            ) : pending ? (
               <span className="predictive-loading">Predicting…</span>
-            ) : mlOffline ? (
-              <span className="predictive-error">
-                Predictions are offline right now
-              </span>
             ) : (
               <span>
-                Peak: <strong style={{ color: peakColor }}>{peakPct}%</strong>
+                Peak: <strong style={{ color: likelihoodColor(peak) }}>{Math.round(peak * 100)}%</strong>
               </span>
             )}
           </span>
         </div>
       </div>
 
-      {/* Map */}
-      <div className="map-shell" style={{ height }}>
-        <MapContainer
-          center={LEUVEN_CENTER}
-          zoom={14}
-          minZoom={LEUVEN_MIN_ZOOM}
-          maxZoom={LEUVEN_MAX_ZOOM}
-          maxBounds={LEUVEN_BOUNDS}
-          maxBoundsViscosity={0.9}
-          scrollWheelZoom
-          style={{ height: "100%", width: "100%" }}
-        >
-          <BaseTiles />
-          <ScaleControl position="bottomleft" imperial={false} />
-          {!mlOffline && <PredictiveHeatmapLayer points={points} />}
-        </MapContainer>
-
-        <div className="legend">
-          <div style={{ fontWeight: 600, marginBottom: 6, fontSize: 12 }}>
-            Trash likelihood
-          </div>
-          {[
-            { color: "#dc2626", label: "Very high" },
-            { color: "#f97316", label: "High" },
-            { color: "#eab308", label: "Moderate" },
-            { color: "#84cc16", label: "Low" },
-            { color: "#22c55e", label: "Clean" },
-          ].map(({ color, label }) => (
-            <div key={label} className="legend-row">
-              <div className="legend-swatch" style={{ background: color }} />
-              <span>{label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      <MapBase
+        legend={
+          <>
+            <div className="legend-title">Trash likelihood</div>
+            {LIKELIHOOD_BANDS.map(({ rgb, label }) => (
+              <div key={label} className="legend-row">
+                <div className="legend-swatch" style={{ background: cssColor(rgb) }} />
+                <span>{label}</span>
+              </div>
+            ))}
+          </>
+        }
+      >
+        {!offline && <PredictiveHeatmapLayer points={points} />}
+      </MapBase>
     </div>
   );
 }

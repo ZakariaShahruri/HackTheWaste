@@ -505,10 +505,15 @@ textarea {
 
 .map-shell {
   position: relative;
-  min-height: 420px;
+  height: clamp(320px, 60vh, 560px);
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--border);
+}
+
+/* Muted streets, so clan territories and hotspots stand out. */
+.map-shell .leaflet-tile-pane {
+  filter: saturate(0.55) brightness(1.04);
 }
 
 .leaflet-container {
@@ -530,6 +535,11 @@ textarea {
   line-height: 1.6;
   box-shadow: var(--shadow);
   z-index: 400;
+}
+
+.legend-title {
+  font-weight: 600;
+  margin-bottom: 4px;
 }
 
 .legend-row {
@@ -1517,8 +1527,8 @@ textarea {
   font-style: italic;
 }
 
-.predictive-error {
-  color: #dc2626;
+.predictive-offline {
+  color: var(--warning);
 }
 
 .wa-float-btn {
@@ -1654,4 +1664,11 @@ textarea {
 
 .reward-skeleton {
   height: 320px;
+}
+
+.heat-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
 }
