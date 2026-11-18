@@ -1,9 +1,11 @@
 package be.leuven.leuvengo.service;
 
+import be.leuven.leuvengo.config.LeuvenGoProperties;
 import be.leuven.leuvengo.domain.CleanlinessScale;
 import be.leuven.leuvengo.domain.*;
 import be.leuven.leuvengo.repository.*;
 
+import be.leuven.leuvengo.security.AuthService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -36,24 +38,33 @@ public class DemoDataSeeder {
     private final ReportRepository reports;
     private final ReportService reportService;
     private final ScoringService scoring;
+    private final AuthService auth;
+    private final LeuvenGoProperties props;
 
     public DemoDataSeeder(FacultyRepository faculties,
                           StreetSegmentRepository segments,
                           RewardItemRepository rewards,
                           ReportRepository reports,
                           ReportService reportService,
-                          ScoringService scoring) {
+                          ScoringService scoring,
+                          AuthService auth,
+                          LeuvenGoProperties props) {
         this.faculties = faculties;
         this.segments = segments;
         this.rewards = rewards;
         this.reports = reports;
         this.reportService = reportService;
         this.scoring = scoring;
+        this.auth = auth;
+        this.props = props;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void seed() {
+        if (props.demo().enabled()) {
+            auth.ensureCrewAccount(props.demo().crewEmail(), props.demo().crewPassword());
+        }
         if (faculties.count() > 0) return;
         log.info("Seeding Leuven Go demo data...");
 

@@ -1,6 +1,9 @@
 package be.leuven.leuvengo.web.error;
 
+import be.leuven.leuvengo.config.ClockConfig;
 import be.leuven.leuvengo.config.LeuvenGoProperties;
+import be.leuven.leuvengo.security.AuthService;
+import be.leuven.leuvengo.security.RateLimiter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
@@ -10,6 +13,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,11 +27,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = ApiExceptionHandlerTest.ThrowingController.class)
-@Import({ApiExceptionHandlerTest.ThrowingController.class, ApiExceptionHandlerTest.PropertiesConfig.class})
+@Import({ApiExceptionHandlerTest.ThrowingController.class, ApiExceptionHandlerTest.PropertiesConfig.class,
+        RateLimiter.class, ClockConfig.class})
 class ApiExceptionHandlerTest {
 
     @Autowired
     MockMvc mvc;
+
+    /** Needed by the @CurrentUser resolver that the web slice picks up. */
+    @MockitoBean
+    AuthService auth;
 
     @Test
     void notFoundExceptionBecomes404WithMessage() throws Exception {

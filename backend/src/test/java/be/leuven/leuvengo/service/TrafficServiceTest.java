@@ -6,12 +6,14 @@ import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.domain.StreetSegment;
 import be.leuven.leuvengo.repository.HotspotRepository;
 import be.leuven.leuvengo.repository.StreetSegmentRepository;
+import be.leuven.leuvengo.support.TestProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -38,8 +40,7 @@ class TrafficServiceTest {
         when(segments.findAll()).thenReturn(List.of(
                 segment("Oude Markt", LAT, LNG),
                 segment("Station", 50.8810, 4.7160)));
-        LeuvenGoProperties props = new LeuvenGoProperties(
-                new LeuvenGoProperties.Traffic(40, 72, 3), null, null, null, null, null);
+        LeuvenGoProperties props = TestProperties.with(Map.of("traffic.cluster-radius-m", "40"));
         traffic = new TrafficService(hotspots, segments, props);
     }
 

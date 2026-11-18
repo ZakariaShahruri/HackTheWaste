@@ -23,7 +23,9 @@ public record LeuvenGoProperties(
         @Valid @DefaultValue Gemini gemini,
         @Valid @DefaultValue Twilio twilio,
         @Valid @DefaultValue Storage storage,
-        @Valid @DefaultValue Ml ml) {
+        @Valid @DefaultValue Ml ml,
+        @Valid @DefaultValue Security security,
+        @Valid @DefaultValue Demo demo) {
 
     /** Hotspot clustering and escalation. */
     public record Traffic(
@@ -67,4 +69,14 @@ public record LeuvenGoProperties(
             @DefaultValue("trash-photos") String azureContainer) {}
 
     public record Ml(@DefaultValue("http://localhost:8000") String apiUrl) {}
+
+    public record Security(
+            /** How long a login stays valid. */
+            @DefaultValue("7d") Duration sessionTtl) {}
+
+    /** Demo-instance conveniences (seed data, a public crew login). */
+    public record Demo(
+            @DefaultValue("true") boolean enabled,
+            @DefaultValue("crew@leuvengo.demo") String crewEmail,
+            @DefaultValue("cleanleuven") String crewPassword) {}
 }

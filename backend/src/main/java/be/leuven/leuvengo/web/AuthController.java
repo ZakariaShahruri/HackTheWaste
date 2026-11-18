@@ -1,90 +1,77 @@
 package be.leuven.leuvengo.web;
 
 import be.leuven.leuvengo.domain.AppUser;
-import be.leuven.leuvengo.repository.AppUserRepository;
-import org.springframework.http.HttpStatus;
+import be.leuven.leuvengo.domain.Role;
+import be.leuven.leuvengo.security.AuthService;
+import be.leuven.leuvengo.security.CurrentUser;
+import be.leuven.leuvengo.security.RateLimited;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
-
-import java.time.Instant;
-import java.util.UUID;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private static final BCryptPasswordEncoder BCRYPT = new BCryptPasswordEncoder();
+    private final AuthService auth;
 
-    private final AppUserRepository users;
-
-    public AuthController(AppUserRepository users) {
-        this.users = users;
+    public AuthController(AuthService auth) {
+        this.auth = auth;
     }
 
-    public record RegisterRequest(String email, String password, String facultyShortCode, boolean consentGiven) {}
-    public record LoginRequest(String email, String password) {}
-    public record AuthResponse(Long id, String email, String facultyShortCode, String token) {}
+    /** BCrypt only looks at the first 72 bytes, so longer passwords are rejected outright. */
+    public record RegisterRequest(
+            @NotBlank @Email @Size(max = 254) String email,
+            @NotBlank @Size(min = 8, max = 72) String password,
+            @Size(max = 10) String facultyShortCode,
+            Boolean consentGiven) {}
+
+    public record LoginRequest(
+            @NotBlank @Email String email,
+            @NotBlank @Size(max = 72) String password) {}
+
+    /** {@code token} is only present right after register/login. */
+    public record AuthResponse(Long id, String email, String facultyShortCode, Role role, String token) {
+
+        static AuthResponse of(AppUser u, String token) {
+            return new AuthResponse(u.getId(), u.getEmail(), u.getFacultyShortCode(), u.getRole(), token);
+        }
+    }
 
     @PostMapping("/register")
-    public AuthResponse register(@RequestBody RegisterRequest req) {
-        if (req.email() == null || req.email().isBlank())
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required");
-        if (req.password() == null || req.password().length() < 6)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at least 6 characters");
-        if (!req.consentGiven())
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You must accept the data consent to create an account");
-        if (users.existsByEmail(req.email().toLowerCase().trim()))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already registered");
-
-        Instant now = Instant.now();
-        AppUser user = new AppUser();
-        user.setEmail(req.email().toLowerCase().trim());
-        user.setPasswordHash(BCRYPT.encode(req.password()));
-        user.setFacultyShortCode(req.facultyShortCode());
-        user.setSessionToken(UUID.randomUUID().toString());
-        user.setConsentGiven(true);
-        user.setConsentGivenAt(now);
-        user.setCreatedAt(now);
-        users.save(user);
-
-        return toResponse(user);
+    @RateLimited(value = "register", requests = 5, perSeconds = 3600)
+    public AuthResponse register(@Valid @RequestBody RegisterRequest req) {
+        AuthService.Session s = auth.register(req.email(), req.password(),
+                blankToNull(req.facultyShortCode()), Boolean.TRUE.equals(req.consentGiven()));
+        return AuthResponse.of(s.user(), s.token());
     }
 
     @PostMapping("/login")
-    public AuthResponse login(@RequestBody LoginRequest req) {
-        AppUser user = users.findByEmail(req.email().toLowerCase().trim())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
-        if (!BCRYPT.matches(req.password(), user.getPasswordHash()))
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
-
-        user.setSessionToken(UUID.randomUUID().toString());
-        users.save(user);
-        return toResponse(user);
+    @RateLimited(value = "login", requests = 10, perSeconds = 300)
+    public AuthResponse login(@Valid @RequestBody LoginRequest req) {
+        AuthService.Session s = auth.login(req.email(), req.password());
+        return AuthResponse.of(s.user(), s.token());
     }
 
     @GetMapping("/me")
-    public AuthResponse me(@RequestHeader(value = "Authorization", required = false) String authHeader) {
-        return toResponse(resolve(authHeader));
+    public AuthResponse me(@CurrentUser AppUser user) {
+        return AuthResponse.of(user, null);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader(value = "Authorization", required = false) String authHeader) {
-        AppUser user = resolve(authHeader);
-        user.setSessionToken(null);
-        users.save(user);
+    public ResponseEntity<Void> logout(@CurrentUser AppUser user) {
+        auth.logout(user);
         return ResponseEntity.noContent().build();
     }
 
-    private AppUser resolve(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer "))
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing token");
-        return users.findBySessionToken(authHeader.substring(7))
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired token"));
-    }
-
-    private static AuthResponse toResponse(AppUser u) {
-        return new AuthResponse(u.getId(), u.getEmail(), u.getFacultyShortCode(), u.getSessionToken());
+    private static String blankToNull(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 }
