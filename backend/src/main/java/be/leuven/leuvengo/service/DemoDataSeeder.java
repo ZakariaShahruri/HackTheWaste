@@ -8,10 +8,9 @@ import be.leuven.leuvengo.repository.*;
 import be.leuven.leuvengo.security.AuthService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -28,7 +27,7 @@ import java.util.Random;
  * something interesting to show out of the box.
  */
 @Component
-public class DemoDataSeeder {
+public class DemoDataSeeder implements SmartInitializingSingleton {
 
     private static final Logger log = LoggerFactory.getLogger(DemoDataSeeder.class);
 
@@ -40,6 +39,7 @@ public class DemoDataSeeder {
     private final ScoringService scoring;
     private final AuthService auth;
     private final LeuvenGoProperties props;
+    private final TransactionTemplate transaction;
 
     public DemoDataSeeder(FacultyRepository faculties,
                           StreetSegmentRepository segments,
@@ -48,7 +48,8 @@ public class DemoDataSeeder {
                           ReportService reportService,
                           ScoringService scoring,
                           AuthService auth,
-                          LeuvenGoProperties props) {
+                          LeuvenGoProperties props,
+                          TransactionTemplate transaction) {
         this.faculties = faculties;
         this.segments = segments;
         this.rewards = rewards;
@@ -57,11 +58,19 @@ public class DemoDataSeeder {
         this.scoring = scoring;
         this.auth = auth;
         this.props = props;
+        this.transaction = transaction;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
-    @Transactional
-    public void seed() {
+    /**
+     * Runs once every bean exists but before the web server starts, so the
+     * first request after a deploy never sees a half-seeded city.
+     */
+    @Override
+    public void afterSingletonsInstantiated() {
+        transaction.executeWithoutResult(status -> seed());
+    }
+
+    private void seed() {
         if (props.demo().enabled()) {
             auth.ensureCrewAccount(props.demo().crewEmail(), props.demo().crewPassword());
         }
