@@ -8,7 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PointsPolicyTest {
 
     @ParameterizedTest
-    @CsvSource({"100,1", "85,1", "80,2", "50,3", "19,5", "0,6"})
+    @CsvSource({"100,10", "85,17", "50,35", "19,50", "0,60", "-5,60", "130,10"})
     void dirtierReportsEarnMore(int score, int points) {
         assertThat(PointsPolicy.pointsFor(score)).isEqualTo(points);
     }

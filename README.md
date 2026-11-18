@@ -53,8 +53,9 @@ flowchart LR
 
    Scores are refreshed after every report and hourly, so streets drift back
    to the prior as reports age.
-5. **Reward.** Each report earns its clan `1 + (100 - score) / 20` points, so
-   the dirtiest spots are worth the most. Text `clan CODE` to the bot to pick
+5. **Reward.** Each report earns its clan `10 + (100 - score) / 2` points, from
+   10 for a clean street to 60 for a filthy one, so the dirtiest spots are worth
+   the most. Text `clan CODE` to the bot to pick
    the clan your WhatsApp reports count for.
 6. **Predict.** A small scikit-learn model estimates how likely litter is across
    Leuven for any weekday and hour. The backend proxies it; browsers never call
