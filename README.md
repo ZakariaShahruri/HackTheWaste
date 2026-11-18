@@ -220,7 +220,9 @@ cd ml       && pip install -r requirements-dev.txt && pytest
 The backend suite includes a test that boots the app on a real Postgres in
 Docker (Testcontainers), so the Flyway migrations and entity mappings are
 checked against the production database. It is skipped when Docker isn't
-running. GitHub Actions runs all three suites on every push.
+running. GitHub Actions runs all three suites on every push, then builds the
+images, starts the compose stack and runs `scripts/smoke.sh` against it. The
+same script checks a deployed backend: `scripts/smoke.sh https://<backend-url>`.
 
 ## Limitations
 
