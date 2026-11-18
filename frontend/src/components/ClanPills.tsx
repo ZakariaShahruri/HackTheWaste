@@ -1,4 +1,5 @@
 import type { FacultyDto } from "../api/types";
+import { readableText } from "../lib/colors";
 
 interface Props {
   faculties: FacultyDto[];
@@ -33,7 +34,7 @@ export function ClanPills({ faculties, selected, onSelect, noneLabel, label }: P
             className={`btn btn-sm clan-pill${active ? " active" : ""}`}
             aria-pressed={active}
             title={f.name}
-            style={{ ["--clan" as string]: f.color }}
+            style={{ ["--clan" as string]: f.color, ["--clan-ink" as string]: readableText(f.color) }}
             onClick={() => onSelect(active ? undefined : f.shortCode)}
           >
             {f.emoji} {f.shortCode}

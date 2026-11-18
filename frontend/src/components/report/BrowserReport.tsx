@@ -74,12 +74,12 @@ export function BrowserReport() {
     <form className="browser-report" onSubmit={(e) => void submit(e)}>
       <ol className="report-steps">
         <li>
-          <h3 className="report-step-title">Where is it?</h3>
+          <h2 className="report-step-title">Where is it?</h2>
           <LocationPicker value={spot} onChange={setSpot} />
         </li>
 
         <li>
-          <h3 className="report-step-title">Snap the litter</h3>
+          <h2 className="report-step-title">Snap the litter</h2>
           <label className={`photo-drop${photo ? " has-photo" : ""}`}>
             <input
               type="file"
@@ -97,9 +97,9 @@ export function BrowserReport() {
         </li>
 
         <li>
-          <h3 className="report-step-title">
+          <h2 className="report-step-title">
             Score for a clan <span className="muted">(optional)</span>
-          </h3>
+          </h2>
           <select name="clan" aria-label="Clan" className="clan-select" value={clan} onChange={(e) => setClan(e.target.value)}>
             <option value="">No clan</option>
             {(faculties.data ?? []).map((f) => (

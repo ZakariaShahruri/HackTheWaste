@@ -5,6 +5,7 @@
   --fg: #0f172a;
   --fg-soft: #475569;
   --border: #e2e8f0;
+  --whatsapp: #25d366;
   --primary: #0f766e;
   --primary-soft: #ccfbf1;
   --accent: #f59e0b;
@@ -148,7 +149,13 @@ textarea {
 
 .nav .btn-primary { color: #fff; }
 .nav .btn-primary:hover { color: #fff; background: var(--primary); }
-.nav .btn-accent { color: #1f2937; }
+.nav /* WhatsApp green is too light for white text, hence the dark label. */
+.btn-whatsapp {
+  background: var(--whatsapp);
+  color: var(--fg);
+}
+
+.btn-accent { color: #1f2937; }
 .nav .btn-accent:hover { color: #1f2937; background: var(--accent); }
 .nav .btn-ghost { color: var(--fg); }
 .theme-pro .nav .btn-ghost { color: var(--pro-fg); }
@@ -350,7 +357,7 @@ textarea {
 }
 
 .clan-chip.active .clan-chip-code {
-  color: var(--clan);
+  color: var(--fg);
 }
 
 .stat-grid {
@@ -606,7 +613,6 @@ textarea {
   border-radius: 8px;
   font-weight: 700;
   font-size: 13px;
-  color: white;
 }
 
 /* student theme overrides */
@@ -715,6 +721,10 @@ textarea {
   transform: translateX(-50%);
   font-size: 10px;
   color: var(--fg-soft);
+}
+
+.theme-pro .sparkbar small {
+  color: var(--pro-fg-soft);
 }
 
 /* clan rankings on the student dashboard */
@@ -903,6 +913,10 @@ textarea {
 
 .theme-pro .tabbar {
   background: rgba(148, 163, 184, 0.1);
+}
+
+.theme-pro .tabbar button {
+  color: var(--pro-fg-soft);
 }
 
 .theme-pro .tabbar button.active {
@@ -1236,7 +1250,6 @@ textarea {
   padding: 2px 8px;
   border-radius: 999px;
   letter-spacing: 0.04em;
-  color: white;
 }
 
 .feed-username {
@@ -1429,7 +1442,7 @@ textarea {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: #25D366;
+  background: var(--whatsapp);
   color: white;
   font-size: 24px;
   display: grid;
@@ -1908,7 +1921,7 @@ textarea {
 
 .clan-pill.active {
   background: var(--clan, var(--fg));
-  color: white;
+  color: var(--clan-ink, white);
 }
 
 .clan-pill-none.active {
@@ -1932,4 +1945,94 @@ textarea {
 
 .feed-page {
   max-width: 1100px;
+}
+
+/* log in and sign up */
+.auth-page {
+  max-width: 420px;
+  margin-top: 60px;
+}
+
+.auth-page-wide {
+  max-width: 480px;
+}
+
+.card.auth-card {
+  padding: 32px;
+}
+
+.auth-title {
+  font-size: 24px;
+  margin-bottom: 6px;
+}
+
+.auth-subtitle {
+  font-size: 14px;
+  margin-bottom: 24px;
+}
+
+.auth-switch {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--fg-soft);
+}
+
+.auth-switch a {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.btn-block {
+  width: 100%;
+  justify-content: center;
+}
+
+.form-grid .form-error {
+  margin-top: 0;
+}
+
+.field-hint {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--fg-soft);
+}
+
+.consent {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 0;
+  background: var(--bg-elev);
+}
+
+.consent-title {
+  font-weight: 600;
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.consent-list {
+  font-size: 13px;
+  color: var(--fg-soft);
+  padding-left: 18px;
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+
+.form-grid .consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--fg);
+}
+
+.form-grid .consent-check input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  flex-shrink: 0;
 }

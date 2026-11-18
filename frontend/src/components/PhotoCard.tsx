@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { assetUrl } from "../api/http";
 import type { FeedItemDto } from "../api/types";
+import { filled } from "../lib/colors";
 import { timeAgo } from "../lib/time";
 import { ScoreChip } from "./ScoreChip";
 
@@ -27,7 +28,7 @@ export function PhotoCard({ photo: p }: { photo: FeedItemDto }) {
         <div className="spread feed-heading">
           <div className="feed-who">
             {p.facultyShortCode && (
-              <span className="feed-clan" style={{ background: p.facultyColor ?? "var(--fg-soft)" }}>
+              <span className="feed-clan" style={filled(p.facultyColor ?? "var(--fg-soft)")}>
                 {p.facultyEmoji} {p.facultyShortCode}
               </span>
             )}

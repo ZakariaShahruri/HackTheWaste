@@ -60,9 +60,9 @@ export default function ProfessionalDashboard() {
             <div className="card-title">
               {mapMode === "live" ? "Live hotspot map" : "Predictive heatmap · ML forecast"}
             </div>
-            <h3 className="card-heading">
+            <h2 className="card-heading">
               {mapMode === "live" ? "Where to send crews now" : "Where trash will accumulate — pick a day & time"}
-            </h3>
+            </h2>
           </div>
           <div className="tabbar">
             <button className={mapMode === "predictive" ? "active" : ""} onClick={() => setMapMode("predictive")}>
@@ -117,7 +117,7 @@ export default function ProfessionalDashboard() {
         <div className="card-header">
           <div>
             <div className="card-title">AI cleanliness scores by segment</div>
-            <h3 className="card-heading">Streets ranked by current need</h3>
+            <h2 className="card-heading">Streets ranked by current need</h2>
           </div>
           <div className="tabbar">
             {districts.map((d) => (
@@ -164,7 +164,7 @@ export default function ProfessionalDashboard() {
         <div className="card-header">
           <div>
             <div className="card-title">Recent Planon work orders</div>
-            <h3 className="card-heading">Auto-dispatched from clustered reports</h3>
+            <h2 className="card-heading">Auto-dispatched from clustered reports</h2>
           </div>
           <Link to="/pro/operations" className="btn btn-ghost btn-sm">
             See all

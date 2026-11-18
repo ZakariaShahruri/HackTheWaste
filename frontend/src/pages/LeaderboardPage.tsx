@@ -56,7 +56,7 @@ function BoardRow({ entry: e, leader, share }: { entry: LeaderboardEntry; leader
           <div style={{ width: `${share * 100}%`, background: e.color }} />
         </div>
       </div>
-      <div className="board-points" style={{ color: e.color }}>
+      <div className="board-points">
         {e.points}
         <div className="muted board-unit">pts</div>
       </div>

@@ -44,7 +44,7 @@ export default function OperationsPage() {
           <div className="card-header">
             <div>
               <div className="card-title">Active hotspots</div>
-              <h3 className="card-heading">Targeted routing for cleaning crews & machinery</h3>
+              <h2 className="card-heading">Targeted routing for cleaning crews & machinery</h2>
             </div>
           </div>
           <HotspotMap hotspots={hotspots.data ?? []} />

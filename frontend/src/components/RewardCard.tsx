@@ -22,7 +22,7 @@ export function RewardCard({ reward, blocker, busy, onRedeem }: Props) {
         <span className="tag">{reward.category}</span>
         <span className="reward-stock">{reward.stock > 0 ? `${reward.stock} left` : "sold out"}</span>
       </div>
-      <h3 style={{ fontSize: 18, marginTop: 8 }}>{reward.title}</h3>
+      <h2 style={{ fontSize: 18, marginTop: 8 }}>{reward.title}</h2>
       <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
         {reward.description}
       </p>

@@ -21,8 +21,7 @@ export function WhatsAppReportCTA({ variant, message, className }: Props) {
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="btn btn-primary"
-      style={{ background: "#25D366", color: "white" }}
+      className="btn btn-whatsapp"
     >
       💬 Report on WhatsApp
     </a>

@@ -84,9 +84,9 @@ export default function StudentDashboard() {
           <div className="card-header">
             <div>
               <div className="card-title">Faculty territories</div>
-              <h3 className="card-heading">
+              <h2 className="card-heading">
                 {myFaculty ? `${myFaculty.emoji} ${myFaculty.name}'s patch` : "Tap a clan to highlight their patch"}
-              </h3>
+              </h2>
             </div>
             <Link to="/student/leaderboard" className="btn btn-ghost btn-sm">
               Full leaderboard →
@@ -127,7 +127,7 @@ export default function StudentDashboard() {
         <div className="card-header">
           <div>
             <div className="card-title">Streets to clean up</div>
-            <h3 className="card-heading">Lowest scoring spots near you</h3>
+            <h2 className="card-heading">Lowest scoring spots near you</h2>
           </div>
           <Link to="/market" className="btn btn-accent btn-sm">🛍 Spend points</Link>
         </div>
@@ -183,7 +183,7 @@ function RankingRow({ entry: e, selected, onToggle }: { entry: LeaderboardEntry;
         <strong>{e.name}</strong>
         <span className="muted">Clan {e.shortCode}</span>
       </span>
-      <span className="lb-points" style={{ color: e.color }}>{e.points}</span>
+      <span className="lb-points">{e.points}</span>
     </button>
   );
 }
