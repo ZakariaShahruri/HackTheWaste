@@ -7,6 +7,7 @@ import be.leuven.leuvengo.repository.WorkOrderRepository;
 import be.leuven.leuvengo.service.AuthService;
 import be.leuven.leuvengo.service.PlanonService;
 import be.leuven.leuvengo.web.dto.Dtos;
+import be.leuven.leuvengo.web.error.NotFoundException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -45,7 +46,8 @@ public class WorkOrderController {
             @RequestHeader(value = "Authorization", required = false) String auth,
             @PathVariable Long id) {
         authService.requireAuth(auth);
-        WorkOrder w = workOrders.findById(id).orElseThrow();
+        WorkOrder w = workOrders.findById(id)
+                .orElseThrow(() -> new NotFoundException("Work order", id));
         w.setStatus(WorkOrder.Status.COMPLETED);
         w.setCompletedAt(Instant.now());
         if (w.getHotspot() != null) {
@@ -62,7 +64,8 @@ public class WorkOrderController {
             @RequestHeader(value = "Authorization", required = false) String auth,
             @PathVariable Long hotspotId) {
         authService.requireAuth(auth);
-        Hotspot h = hotspots.findById(hotspotId).orElseThrow();
+        Hotspot h = hotspots.findById(hotspotId)
+                .orElseThrow(() -> new NotFoundException("Hotspot", hotspotId));
         return ResponseEntity.ok(Dtos.of(planon.dispatch(h)));
     }
 }
