@@ -2,10 +2,12 @@ package be.leuven.leuvengo.whatsapp;
 
 import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.net.SafeHttpFetcher;
+import be.leuven.leuvengo.repository.FacultyRepository;
 import be.leuven.leuvengo.repository.PendingReportRepository;
 import be.leuven.leuvengo.repository.ReportRepository;
 import be.leuven.leuvengo.security.Pseudonyms;
 import be.leuven.leuvengo.service.GeminiService;
+import be.leuven.leuvengo.service.PointsPolicy;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +37,7 @@ class WhatsAppBotIT {
     @Autowired PendingReportRepository pending;
     @Autowired ReportRepository reports;
     @Autowired Pseudonyms pseudonyms;
+    @Autowired FacultyRepository faculties;
     @MockitoBean GeminiService gemini;
     @MockitoBean TwilioMediaFetcher media;
 
@@ -134,6 +137,51 @@ class WhatsAppBotIT {
 
         assertThat(photo(ANA)).contains("offline").doesNotContain("/100");
         assertThat(latestReport().getCleanlinessScore()).isEqualTo(50);
+    }
+
+    @Test
+    void joiningAClanCreditsItForLaterReports() {
+        int before = faculties.findByShortCode("EKO").orElseThrow().getPoints();
+
+        assertThat(text(ANA, "  Clan eko ")).contains("now reporting for");
+        location(ANA);
+        photo(ANA);
+
+        Report latest = latestReport();
+        assertThat(latest.getCrediteFaculty().getShortCode()).isEqualTo("EKO");
+        assertThat(faculties.findByShortCode("EKO").orElseThrow().getPoints())
+                .isEqualTo(before + PointsPolicy.pointsFor(10));
+    }
+
+    @Test
+    void reportsWithoutAClanCreditNobody() {
+        location(BOB);
+        photo(BOB);
+        assertThat(latestReport().getCrediteFaculty()).isNull();
+    }
+
+    @Test
+    void anUnknownClanListsTheRealOnes() {
+        assertThat(text(ANA, "clan NOPE"))
+                .startsWith("There's no clan called \"NOPE\"")
+                .contains("EKO", "Reply \"clan CODE\"");
+        assertThat(text(ANA, "clan")).doesNotContain("no clan called").contains("EKO");
+    }
+
+    @Test
+    void theClanCommandShowsYourCurrentClan() {
+        text(ANA, "clan EKO");
+        assertThat(text(ANA, "clan")).contains("Your clan: EKO");
+    }
+
+    @Test
+    void otherTextGetsTheWelcome() {
+        assertThat(text(ANA, "hello")).isEqualTo(WhatsAppBot.WELCOME);
+        assertThat(text(ANA, "clans are cool")).isEqualTo(WhatsAppBot.WELCOME);
+    }
+
+    private String text(String from, String body) {
+        return bot.handle(new WhatsAppBot.Inbound(from, body, null, null, null));
     }
 
     private String location(String from) {

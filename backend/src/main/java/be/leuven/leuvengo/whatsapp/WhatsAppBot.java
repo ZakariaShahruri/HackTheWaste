@@ -1,6 +1,7 @@
 package be.leuven.leuvengo.whatsapp;
 
 import be.leuven.leuvengo.domain.CleanlinessScale;
+import be.leuven.leuvengo.domain.Faculty;
 import be.leuven.leuvengo.domain.TrashPhoto;
 import be.leuven.leuvengo.net.SafeHttpFetcher;
 import be.leuven.leuvengo.repository.TrashPhotoRepository;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.Clock;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -22,6 +25,7 @@ import java.util.stream.Collectors;
  *   <li>the user shares a location pin, and we remember it for 30 minutes;</li>
  *   <li>the user sends a photo, and we score it, file the report and reply with the verdict.</li>
  * </ol>
+ * Sending {@code clan CODE} links the sender to a faculty, which then earns points for their reports.
  * Phone numbers are only used to derive pseudonyms; they are never stored or logged.
  */
 @Service
@@ -41,7 +45,9 @@ public class WhatsAppBot {
         }
     }
 
-    static final String WELCOME = "Hi! Send a 📍 location pin to start a cleanliness report.";
+    static final String WELCOME = "Hi! Send a 📍 location pin to start a cleanliness report.\n\n"
+            + "Reply \"clan\" to pick the faculty your reports earn points for.";
+    private static final Pattern CLAN_COMMAND = Pattern.compile("(?i)\\s*clan\\b\\s*(\\S*)\\s*");
     static final String NEED_LOCATION = "We don't have a location yet. Please share a 📍 location pin first, "
             + "then send the photo again.";
     static final String ASK_FOR_PHOTO = "Got it! 📍 Now please send a photo of the litter "
@@ -55,11 +61,12 @@ public class WhatsAppBot {
     private final BlobStorageService blobStorage;
     private final ReportService reports;
     private final TrashPhotoRepository photos;
+    private final ClanMembership clans;
     private final Clock clock;
 
     public WhatsAppBot(WhatsAppSessions sessions, Pseudonyms pseudonyms, TwilioMediaFetcher media,
                        GeminiService gemini, BlobStorageService blobStorage, ReportService reports,
-                       TrashPhotoRepository photos, Clock clock) {
+                       TrashPhotoRepository photos, ClanMembership clans, Clock clock) {
         this.sessions = sessions;
         this.pseudonyms = pseudonyms;
         this.media = media;
@@ -67,6 +74,7 @@ public class WhatsAppBot {
         this.blobStorage = blobStorage;
         this.reports = reports;
         this.photos = photos;
+        this.clans = clans;
         this.clock = clock;
     }
 
@@ -87,7 +95,30 @@ public class WhatsAppBot {
             log.info("WhatsApp photo from {}", publicId);
             return handlePhoto(senderKey, publicId, message.mediaUrl());
         }
+        if (message.body() != null) {
+            Matcher clan = CLAN_COMMAND.matcher(message.body());
+            if (clan.matches()) {
+                return handleClan(senderKey, clan.group(1));
+            }
+        }
         return WELCOME;
+    }
+
+    private String handleClan(String senderKey, String code) {
+        if (!code.isEmpty()) {
+            Optional<Faculty> joined = clans.join(senderKey, code);
+            if (joined.isPresent()) {
+                Faculty f = joined.get();
+                return "You're now reporting for " + f.getEmoji() + " " + f.getName()
+                        + ". Every report you send earns them points!";
+            }
+        }
+        String current = clans.clanOf(senderKey).map(f -> "Your clan: " + f.getShortCode() + " " + f.getEmoji() + "\n\n").orElse("");
+        String options = clans.all().stream()
+                .map(f -> f.getShortCode() + " " + f.getEmoji() + " " + f.getName())
+                .collect(Collectors.joining("\n"));
+        return (code.isEmpty() ? "" : "There's no clan called \"" + code + "\".\n\n")
+                + current + "Reply \"clan CODE\" to join one of:\n" + options;
     }
 
     private String handlePhoto(String senderKey, String publicId, String mediaUrl) {
@@ -111,15 +142,17 @@ public class WhatsAppBot {
         }
 
         String photoUrl = blobStorage.upload(photo.bytes(), photo.contentType(), publicId).orElse(null);
-        file(location.get(), ai, photoUrl, publicId);
+        file(location.get(), ai, photoUrl, publicId, clans.clanOf(senderKey).orElse(null));
         sessions.finish(senderKey);
         return verdict(ai);
     }
 
-    private void file(WhatsAppSessions.Location at, GeminiService.ScoreResult ai, String photoUrl, String publicId) {
+    private void file(WhatsAppSessions.Location at, GeminiService.ScoreResult ai, String photoUrl,
+                      String publicId, Faculty clan) {
         String tags = ai.tags().isEmpty() ? null : String.join(",", ai.tags());
         reports.submit(new ReportService.Submission(
-                at.lat(), at.lng(), ai.score(), "WhatsApp report", photoUrl, tags, null, publicId));
+                at.lat(), at.lng(), ai.score(), "WhatsApp report", photoUrl, tags,
+                clan == null ? null : clan.getShortCode(), publicId));
 
         if (photoUrl != null) {
             TrashPhoto feedItem = new TrashPhoto();
@@ -130,6 +163,11 @@ public class WhatsAppBot {
             feedItem.setCleanlinessScore(ai.score());
             feedItem.setUserRating(CleanlinessScale.toRating(ai.score()));
             feedItem.setTags(tags);
+            if (clan != null) {
+                feedItem.setFacultyShortCode(clan.getShortCode());
+                feedItem.setFacultyEmoji(clan.getEmoji());
+                feedItem.setFacultyColor(clan.getColor());
+            }
             feedItem.setReportedAt(clock.instant());
             photos.save(feedItem);
         }
