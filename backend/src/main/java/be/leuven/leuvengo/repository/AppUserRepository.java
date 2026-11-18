@@ -19,4 +19,12 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     @Modifying
     @Query("update AppUser u set u.points = u.points + :points where u.id = :id")
     int addPoints(long id, int points);
+
+    /** Spends points only if the balance covers them. Returns 0 when it doesn't. */
+    @Modifying
+    @Query("update AppUser u set u.points = u.points - :cost where u.id = :id and u.points >= :cost")
+    int spendPoints(long id, int cost);
+
+    @Query("select u.points from AppUser u where u.id = :id")
+    int pointsOf(long id);
 }

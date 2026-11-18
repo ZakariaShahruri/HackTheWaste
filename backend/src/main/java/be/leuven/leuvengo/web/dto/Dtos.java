@@ -38,6 +38,9 @@ public final class Dtos {
                                 String imageRef, String category, Integer costPoints,
                                 Integer stock) {}
 
+    public record RedemptionDto(Long id, Long rewardId, String title, String sponsor,
+                                String voucherCode, int costPoints, Instant redeemedAt) {}
+
     public record StatsDto(long totalReports, long openHotspots, long dispatchedOrders,
                            long completedOrders, double avgCleanliness,
                            List<TimeBucket> reportsLast7Days,
@@ -100,6 +103,12 @@ public final class Dtos {
         return new RewardItemDto(r.getId(), r.getTitle(), r.getDescription(),
                 r.getSponsor(), r.getImageRef(), r.getCategory(),
                 r.getCostPoints(), r.getStock());
+    }
+
+    public static RedemptionDto of(Redemption r) {
+        RewardItem reward = r.getReward();
+        return new RedemptionDto(r.getId(), reward.getId(), reward.getTitle(), reward.getSponsor(),
+                r.getVoucherCode(), r.getCostPoints(), r.getRedeemedAt());
     }
 
     /** 4 decimals is about 11 m north-south and 7 m east-west in Leuven. */

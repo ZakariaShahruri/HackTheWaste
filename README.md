@@ -56,7 +56,11 @@ flowchart LR
 5. **Reward.** Each report earns its clan `10 + (100 - score) / 2` points, from
    10 for a clean street to 60 for a filthy one, so the dirtiest spots are worth
    the most. Text `clan CODE` to the bot to pick
-   the clan your WhatsApp reports count for.
+   the clan your WhatsApp reports count for. Browser reports from a logged-in
+   account also earn the same points for the account itself, which can be spent
+   on rewards in the marketplace; each redemption returns a voucher code.
+   Stock and balance are taken with conditional updates, so two people can't
+   both get the last item and one balance can't be spent twice.
 6. **Predict.** A small scikit-learn model estimates how likely litter is across
    Leuven for any weekday and hour. The backend proxies it; browsers never call
    the ML service directly.
@@ -157,11 +161,13 @@ The frontend reads `VITE_API_BASE_URL`, `VITE_WHATSAPP_NUMBER` and
 | GET    | `/api/stats`                        | Dashboard figures and the 7-day trend            |
 | GET    | `/api/predictions/grid`             | Litter likelihood grid, `?day=0..6&hour=0..23`   |
 | GET    | `/api/rewards`                      | Rewards marketplace                              |
+| POST   | `/api/rewards/{id}/redeem`          | Spend points on a reward, returns a voucher      |
+| GET    | `/api/rewards/mine`                 | The logged-in user's redeemed rewards            |
 | GET    | `/api/work-orders`                  | Work orders                                      |
 | POST   | `/api/work-orders/{id}/complete`    | Crew only: resolves the hotspot                  |
 | POST   | `/api/work-orders/dispatch/{hotspotId}` | Escalate a hotspot by hand                   |
 | POST   | `/api/auth/register`, `/login`, `/logout` | Accounts                               |
-| GET    | `/api/auth/me`                      | The logged-in user                               |
+| GET    | `/api/auth/me`                      | The logged-in user, including their points       |
 
 Errors always come back as the same JSON shape (`status`, `error`, `message`,
 `path`, `timestamp`), never as stack traces.
