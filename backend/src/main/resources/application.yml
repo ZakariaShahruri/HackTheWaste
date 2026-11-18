@@ -39,6 +39,7 @@ leuvengo:
   twilio:
     account-sid: ${TWILIO_ACCOUNT_SID:}
     auth-token: ${TWILIO_AUTH_TOKEN:}
+    webhook-url: ${TWILIO_WEBHOOK_URL:}
   storage:
     azure-connection-string: ${AZURE_STORAGE_CONNECTION_STRING:}
     azure-container: ${AZURE_STORAGE_CONTAINER:trash-photos}

@@ -10,15 +10,19 @@ import be.leuven.leuvengo.service.BlobStorageService;
 import be.leuven.leuvengo.service.GeminiService;
 import be.leuven.leuvengo.service.ReportService;
 import be.leuven.leuvengo.whatsapp.TwilioMediaFetcher;
+import be.leuven.leuvengo.whatsapp.TwilioWebhookVerifier;
+import jakarta.servlet.http.HttpServletRequest;
 import com.twilio.twiml.MessagingResponse;
 import com.twilio.twiml.messaging.Message;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -45,29 +49,36 @@ public class WhatsAppController {
     private final GeminiService gemini;
     private final BlobStorageService blobStorage;
     private final TwilioMediaFetcher mediaFetcher;
+    private final TwilioWebhookVerifier verifier;
 
     public WhatsAppController(PendingReportRepository pending,
                               TrashPhotoRepository photos,
                               ReportService reportService,
                               GeminiService gemini,
                               BlobStorageService blobStorage,
-                              TwilioMediaFetcher mediaFetcher) {
+                              TwilioMediaFetcher mediaFetcher,
+                              TwilioWebhookVerifier verifier) {
         this.pending = pending;
         this.photos = photos;
         this.reportService = reportService;
         this.gemini = gemini;
         this.blobStorage = blobStorage;
         this.mediaFetcher = mediaFetcher;
+        this.verifier = verifier;
     }
 
     @PostMapping(value = "/webhook", produces = MediaType.APPLICATION_XML_VALUE)
     public String webhook(
+            HttpServletRequest request,
             @RequestParam(name = "From",      required = false) String from,
             @RequestParam(name = "Body",      required = false) String body,
             @RequestParam(name = "Latitude",  required = false) Double lat,
             @RequestParam(name = "Longitude", required = false) Double lng,
             @RequestParam(name = "MediaUrl0", required = false) String mediaUrl) {
 
+        if (!verifier.isGenuine(request)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invalid Twilio signature");
+        }
         log.info("WhatsApp webhook from={} body='{}' lat={} lng={} media={}",
                 from, body, lat, lng, mediaUrl);
 

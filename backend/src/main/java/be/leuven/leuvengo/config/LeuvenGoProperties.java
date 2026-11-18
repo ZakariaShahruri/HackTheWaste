@@ -57,7 +57,9 @@ public record LeuvenGoProperties(
 
     public record Twilio(
             @DefaultValue("") String accountSid,
-            @DefaultValue("") String authToken) {
+            @DefaultValue("") String authToken,
+            /** Public URL Twilio posts to; signatures are computed over it. Empty = use the request URL. */
+            @DefaultValue("") String webhookUrl) {
 
         public boolean hasCredentials() {
             return !accountSid.isBlank() && !authToken.isBlank();
