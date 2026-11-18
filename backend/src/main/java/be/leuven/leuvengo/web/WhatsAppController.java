@@ -5,9 +5,11 @@ import be.leuven.leuvengo.domain.PendingReport;
 import be.leuven.leuvengo.domain.TrashPhoto;
 import be.leuven.leuvengo.repository.PendingReportRepository;
 import be.leuven.leuvengo.repository.TrashPhotoRepository;
+import be.leuven.leuvengo.net.SafeHttpFetcher;
 import be.leuven.leuvengo.service.BlobStorageService;
 import be.leuven.leuvengo.service.GeminiService;
 import be.leuven.leuvengo.service.ReportService;
+import be.leuven.leuvengo.whatsapp.TwilioMediaFetcher;
 import com.twilio.twiml.MessagingResponse;
 import com.twilio.twiml.messaging.Message;
 import org.slf4j.Logger;
@@ -22,14 +24,13 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
-import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
  * Twilio WhatsApp webhook — two-step flow:
  *   1. User shares a location pin  → opens a PendingReport and asks for a photo.
- *   2. User sends a photo          → scores via Gemini 1.5 Flash, saves to feed,
+ *   2. User sends a photo          → scores it with Gemini, saves to feed,
  *      pushes into the hotspot pipeline, and replies with the AI result.
  */
 @RestController
@@ -43,17 +44,20 @@ public class WhatsAppController {
     private final ReportService reportService;
     private final GeminiService gemini;
     private final BlobStorageService blobStorage;
+    private final TwilioMediaFetcher mediaFetcher;
 
     public WhatsAppController(PendingReportRepository pending,
                               TrashPhotoRepository photos,
                               ReportService reportService,
                               GeminiService gemini,
-                              BlobStorageService blobStorage) {
+                              BlobStorageService blobStorage,
+                              TwilioMediaFetcher mediaFetcher) {
         this.pending = pending;
         this.photos = photos;
         this.reportService = reportService;
         this.gemini = gemini;
         this.blobStorage = blobStorage;
+        this.mediaFetcher = mediaFetcher;
     }
 
     @PostMapping(value = "/webhook", produces = MediaType.APPLICATION_XML_VALUE)
@@ -103,11 +107,18 @@ public class WhatsAppController {
 
         PendingReport pr = latest.get();
 
-        // AI cleanliness scoring + fraud detection via Gemini
-        GeminiService.ScoreResult ai = gemini.scorePhoto(mediaUrl);
+        SafeHttpFetcher.Download media;
+        try {
+            media = mediaFetcher.fetch(mediaUrl);
+        } catch (SafeHttpFetcher.FetchException e) {
+            log.warn("Refused WhatsApp media: {}", e.getMessage());
+            return reply("We couldn't open that photo. Please send it again as a normal photo (JPEG or PNG).");
+        }
+
+        GeminiService.ScoreResult ai = gemini.scorePhoto(media.bytes(), media.contentType());
 
         if (ai.fake()) {
-            log.warn("Fake photo rejected from {}: {}", from, ai.fakeReason());
+            log.warn("Fake photo rejected: {}", ai.fakeReason());
             String reason = ai.fakeReason() != null ? ai.fakeReason() : "the image does not appear to be a real photo taken on location";
             return reply("🚫 Photo rejected\n\n"
                     + "Our AI detected that this doesn't look like a genuine on-site photo: "
@@ -119,7 +130,7 @@ public class WhatsAppController {
 
         // Upload to Azure Blob Storage; fall back to Twilio URL if upload fails
         String pseudoId = pseudoIdFor(from);
-        String photoUrl = blobStorage.uploadFromTwilio(mediaUrl, "image/jpeg", pseudoId)
+        String photoUrl = blobStorage.upload(media.bytes(), media.contentType(), pseudoId)
                 .orElse(mediaUrl);
 
         pr.setMediaUrl(photoUrl);
@@ -157,10 +168,11 @@ public class WhatsAppController {
             log.warn("Failed to save photo to feed", ex);
         }
 
-        return reply(buildReply(cleanlinessScore, ai.description(), ai.tags()));
+        return reply(buildReply(ai));
     }
 
-    private static String buildReply(int score, String description, List<String> tags) {
+    private static String buildReply(GeminiService.ScoreResult ai) {
+        int score = ai.score();
         String label = CleanlinessScale.label(score) + switch (CleanlinessScale.toRating(score)) {
             case 4, 5 -> " 🟢";
             case 3 -> " 🟡";
@@ -169,17 +181,20 @@ public class WhatsAppController {
         };
 
         StringBuilder sb = new StringBuilder();
-        sb.append("🤖 AI Analysis complete!\n\n");
-        sb.append("Cleanliness score: ").append(score).append("/100 — ").append(label).append('\n');
-        if (description != null && !description.isBlank()
-                && !"AI scoring unavailable".equals(description)
-                && !"scoring error".equals(description)) {
-            sb.append("Assessment: ").append(description).append('\n');
-        }
-        if (!tags.isEmpty()) {
-            sb.append("Spotted: ").append(
-                    tags.stream().map(t -> "#" + t).collect(Collectors.joining(" "))
-            ).append('\n');
+        if (!ai.aiAvailable()) {
+            sb.append("📝 Report received!\n\n");
+            sb.append("Our AI inspector is offline right now, so your report was logged with a neutral score.\n");
+        } else {
+            sb.append("🤖 AI Analysis complete!\n\n");
+            sb.append("Cleanliness score: ").append(score).append("/100 — ").append(label).append('\n');
+            if (ai.description() != null) {
+                sb.append("Assessment: ").append(ai.description()).append('\n');
+            }
+            if (!ai.tags().isEmpty()) {
+                sb.append("Spotted: ").append(
+                        ai.tags().stream().map(t -> "#" + t).collect(Collectors.joining(" "))
+                ).append('\n');
+            }
         }
         sb.append("\nYour report is live on the Leuven Go feed! "
                 + "Our crew has been notified. Thank you for keeping Leuven clean! 🌿");

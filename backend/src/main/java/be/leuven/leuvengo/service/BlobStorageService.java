@@ -11,12 +11,7 @@ import be.leuven.leuvengo.config.LeuvenGoProperties;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.LocalDate;
-import java.util.Base64;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -27,21 +22,13 @@ public class BlobStorageService {
 
     private final String connectionString;
     private final String containerName;
-    private final String twilioAccountSid;
-    private final String twilioAuthToken;
 
     public BlobStorageService(LeuvenGoProperties props) {
         this.connectionString = props.storage().azureConnectionString();
         this.containerName = props.storage().azureContainer();
-        this.twilioAccountSid = props.twilio().accountSid();
-        this.twilioAuthToken = props.twilio().authToken();
     }
 
     private BlobContainerClient containerClient;
-
-    private final HttpClient http = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
-            .build();
 
     @PostConstruct
     void init() {
@@ -57,47 +44,34 @@ public class BlobStorageService {
     }
 
     /**
-     * Downloads the image from {@code twilioUrl}, uploads it to the trash-photos
-     * container, and returns the public blob URL. Returns empty if storage is
-     * not configured or the upload fails.
+     * Uploads a photo and returns its public blob URL, or empty if storage
+     * isn't configured or the upload fails.
      *
      * @param pseudoId  GDPR-safe user identifier used to organise blobs by path
      */
-    public Optional<String> uploadFromTwilio(String twilioUrl, String mimeType, String pseudoId) {
+    public Optional<String> upload(byte[] bytes, String mimeType, String pseudoId) {
         if (containerClient == null) {
-            log.warn("Blob storage not configured — skipping upload for {}", twilioUrl);
             return Optional.empty();
         }
         try {
-            byte[] bytes = downloadFromTwilio(twilioUrl);
-            String ext = mimeType.contains("png") ? "png" : mimeType.contains("gif") ? "gif" : "jpg";
-            // Path: {date}/{pseudoId}/{uuid}.{ext}  — easy to list and partition for ML exports
+            String ext = switch (mimeType) {
+                case "image/png" -> "png";
+                case "image/webp" -> "webp";
+                case "image/heic", "image/heif" -> "heic";
+                default -> "jpg";
+            };
+            // {date}/{pseudoId}/{uuid}.{ext}: easy to list and partition for ML exports
             String blobName = LocalDate.now() + "/" + pseudoId + "/" + UUID.randomUUID() + "." + ext;
 
             BlobClient blob = containerClient.getBlobClient(blobName);
             blob.upload(new ByteArrayInputStream(bytes), bytes.length, true);
             blob.setHttpHeaders(new BlobHttpHeaders().setContentType(mimeType));
 
-            String url = blob.getBlobUrl();
-            log.info("Uploaded blob: {} ({} bytes)", url, bytes.length);
-            return Optional.of(url);
-        } catch (Exception e) {
-            log.error("Blob upload failed for {}: {}", twilioUrl, e.getMessage());
+            log.info("Uploaded blob {} ({} bytes)", blobName, bytes.length);
+            return Optional.of(blob.getBlobUrl());
+        } catch (RuntimeException e) {
+            log.error("Blob upload failed: {}", e.getMessage());
             return Optional.empty();
         }
-    }
-
-    private byte[] downloadFromTwilio(String url) throws Exception {
-        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(URI.create(url)).GET();
-        if (url.contains("api.twilio.com") && !twilioAccountSid.isBlank()) {
-            String creds = twilioAccountSid + ":" + twilioAuthToken;
-            builder.header("Authorization",
-                    "Basic " + Base64.getEncoder().encodeToString(creds.getBytes()));
-        }
-        HttpResponse<byte[]> resp = http.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
-        if (resp.statusCode() >= 300) {
-            throw new RuntimeException("Twilio download failed: HTTP " + resp.statusCode());
-        }
-        return resp.body();
     }
 }

@@ -1,27 +1,34 @@
 package be.leuven.leuvengo.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import be.leuven.leuvengo.config.LeuvenGoProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import be.leuven.leuvengo.config.LeuvenGoProperties;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
+/** Asks Gemini whether a photo is genuine and how clean the place in it is. */
 @Service
 public class GeminiService {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiService.class);
 
     private static final String ENDPOINT =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=";
+            "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
+    private static final int MAX_TAGS = 3;
 
     private static final String PROMPT =
             "You are a fraud-detecting cleanliness inspector for a city reporting app. "
@@ -33,115 +40,135 @@ public class GeminiService {
             + "(4) there is no real-world depth, lighting, or perspective — it looks flat or digitally generated. "
             + "If the photo is NOT fake, rate the cleanliness of the outdoor urban space on a scale of 0 to 100 "
             + "where 100 = perfectly clean and 0 = completely covered in hazardous waste. "
-            + "Respond with ONLY valid JSON — no markdown fences, no prose: "
+            + "Respond with ONLY valid JSON: "
             + "{\"fake\": <true|false>, \"reason\": \"<one short sentence why it is fake, or null if genuine>\", "
             + "\"score\": <0-100 or null if fake>, \"description\": \"<one short sentence or null if fake>\", "
             + "\"tags\": [\"<tag1>\", \"<tag2>\"]}. "
             + "Tags must name visible waste types such as plastic, glass, paper, food_waste, cigarettes. "
             + "Include at most 3 tags. If fake, tags may be empty.";
 
-    private final String apiKey;
-    private final String twilioAccountSid;
-    private final String twilioAuthToken;
+    /**
+     * The verdict on one photo. When {@code aiAvailable} is false the AI could
+     * not be asked (no key, outage) and {@code score} is a neutral placeholder.
+     */
+    public record ScoreResult(boolean aiAvailable, boolean fake, String fakeReason,
+                              int score, String description, List<String> tags) {
 
-    public GeminiService(LeuvenGoProperties props) {
-        this.apiKey = props.gemini().apiKey();
-        this.twilioAccountSid = props.twilio().accountSid();
-        this.twilioAuthToken = props.twilio().authToken();
+        static final int NEUTRAL_SCORE = 50;
+
+        public static ScoreResult unavailable() {
+            return new ScoreResult(false, false, null, NEUTRAL_SCORE, null, List.of());
+        }
+
+        public static ScoreResult genuine(int score, String description, List<String> tags) {
+            return new ScoreResult(true, false, null, score, description, tags);
+        }
+
+        public static ScoreResult rejected(String reason) {
+            return new ScoreResult(true, true, reason, 0, null, List.of());
+        }
     }
 
+    private final LeuvenGoProperties.Gemini config;
+    private final JsonMapper json;
     private final HttpClient http = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
+            .connectTimeout(Duration.ofSeconds(5))
             .build();
-    private final ObjectMapper mapper = new ObjectMapper();
 
-    public record ScoreResult(boolean fake, String fakeReason, int score, String description, List<String> tags) {}
+    public GeminiService(LeuvenGoProperties props, JsonMapper json) {
+        this.config = props.gemini();
+        this.json = json;
+    }
 
-    /**
-     * Downloads the image at {@code imageUrl}, sends it to Gemini 1.5 Flash,
-     * and returns a cleanliness score (0-100), description, and waste tags.
-     * Falls back gracefully when the API key is absent or the call fails.
-     */
-    public ScoreResult scorePhoto(String imageUrl) {
-        if (apiKey == null || apiKey.isBlank()) {
-            log.warn("GEMINI_API_KEY not configured — returning fallback score");
-            return new ScoreResult(false, null, 50, "AI scoring unavailable", List.of());
+    /** Never throws: any failure degrades to {@link ScoreResult#unavailable()}. */
+    public ScoreResult scorePhoto(byte[] image, String mimeType) {
+        if (!config.enabled()) {
+            log.warn("GEMINI_API_KEY not configured, photo gets a neutral score");
+            return ScoreResult.unavailable();
         }
         try {
-            ImageData image = downloadImage(imageUrl);
-            return callGemini(image);
-        } catch (Exception e) {
-            log.error("Gemini scoring failed for {}: {}", imageUrl, e.getMessage());
-            return new ScoreResult(false, null, 50, "scoring error", List.of());
+            ScoreResult result = parse(call(image, mimeType));
+            log.info("Gemini verdict: fake={} score={} tags={}", result.fake(), result.score(), result.tags());
+            return result;
+        } catch (IOException | JacksonException e) {
+            log.error("Gemini scoring failed: {}", e.getMessage());
+            return ScoreResult.unavailable();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return ScoreResult.unavailable();
         }
     }
 
-    private record ImageData(byte[] bytes, String mimeType) {}
-
-    private ImageData downloadImage(String url) throws Exception {
-        HttpRequest.Builder builder = HttpRequest.newBuilder().uri(URI.create(url)).GET();
-        // Twilio media URLs require Basic auth with account credentials
-        if (url.contains("api.twilio.com") && !twilioAccountSid.isBlank()) {
-            String creds = twilioAccountSid + ":" + twilioAuthToken;
-            builder.header("Authorization",
-                    "Basic " + Base64.getEncoder().encodeToString(creds.getBytes()));
-        }
-        HttpResponse<byte[]> resp = http.send(builder.build(), HttpResponse.BodyHandlers.ofByteArray());
-        if (resp.statusCode() >= 300) {
-            throw new RuntimeException("Image download failed: HTTP " + resp.statusCode());
-        }
-        String contentType = resp.headers().firstValue("Content-Type")
-                .orElse("image/jpeg")
-                .split(";")[0].trim();
-        log.info("Downloaded image: {} bytes, type={}", resp.body().length, contentType);
-        return new ImageData(resp.body(), contentType);
-    }
-
-    private ScoreResult callGemini(ImageData image) throws Exception {
-        String base64 = Base64.getEncoder().encodeToString(image.bytes());
+    private String call(byte[] image, String mimeType) throws IOException, InterruptedException {
         Map<String, Object> body = Map.of(
-                "contents", List.of(Map.of(
-                        "parts", List.of(
-                                Map.of("text", PROMPT),
-                                Map.of("inlineData", Map.of("mimeType", image.mimeType(), "data", base64))
-                        )
-                ))
-        );
+                "contents", List.of(Map.of("parts", List.of(
+                        Map.of("text", PROMPT),
+                        Map.of("inlineData", Map.of(
+                                "mimeType", mimeType,
+                                "data", Base64.getEncoder().encodeToString(image)))))),
+                "generationConfig", Map.of("responseMimeType", "application/json"));
 
-        HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(ENDPOINT + apiKey))
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(ENDPOINT.formatted(config.model())))
+                .timeout(config.timeout())
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)))
+                .header("x-goog-api-key", config.apiKey())
+                .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(body)))
                 .build();
 
-        HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
-        if (resp.statusCode() >= 300) {
-            throw new RuntimeException("Gemini API error " + resp.statusCode() + ": " + resp.body());
+        HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() != 200) {
+            throw new IOException("Gemini API returned HTTP " + response.statusCode());
         }
+        return response.body();
+    }
 
-        JsonNode root = mapper.readTree(resp.body());
-        String text = root.at("/candidates/0/content/parts/0/text").asText("{}").strip();
-
-        // Strip markdown code fences if Gemini adds them despite the prompt
+    /** Turns a generateContent response into a verdict, distrusting everything in it. */
+    ScoreResult parse(String responseBody) {
+        String text = json.readTree(responseBody).at("/candidates/0/content/parts/0/text").asString("").strip();
         if (text.startsWith("```")) {
-            text = text.replaceAll("(?s)```[a-z]*\\n?", "").replace("```", "").strip();
+            text = text.replaceAll("(?s)```[a-z]*\\n?", "").strip();
+        }
+        if (text.isEmpty()) {
+            return ScoreResult.unavailable();
         }
 
-        JsonNode result = mapper.readTree(text);
-        boolean fake = result.path("fake").asBoolean(false);
-        String fakeReason = result.path("reason").isNull() ? null : result.path("reason").asText(null);
-        int score = fake ? 0 : Math.max(0, Math.min(100, result.path("score").asInt(50)));
-        String description = result.path("description").isNull() ? null : result.path("description").asText(null);
-
-        List<String> tags = List.of();
-        if (result.has("tags") && result.get("tags").isArray()) {
-            tags = mapper.convertValue(
-                    result.get("tags"),
-                    mapper.getTypeFactory().constructCollectionType(List.class, String.class));
+        JsonNode verdict = json.readTree(text);
+        if (verdict.path("fake").asBoolean(false)) {
+            return ScoreResult.rejected(optionalText(verdict, "reason"));
         }
+        JsonNode score = verdict.path("score");
+        if (!score.isNumber()) {
+            return ScoreResult.unavailable();
+        }
+        return ScoreResult.genuine(
+                Math.clamp(Math.round(score.asDouble()), 0, 100),
+                optionalText(verdict, "description"),
+                tags(verdict.path("tags")));
+    }
 
-        log.info("Gemini result: fake={} reason='{}' score={} description='{}' tags={}",
-                fake, fakeReason, score, description, tags);
-        return new ScoreResult(fake, fakeReason, score, description, tags);
+    private static String optionalText(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        if (!value.isString()) return null;
+        String text = value.asString().strip();
+        return text.isEmpty() ? null : truncate(text, 200);
+    }
+
+    /** Lower-case snake_case words only, at most three. */
+    private static List<String> tags(JsonNode node) {
+        List<String> tags = new ArrayList<>();
+        if (!node.isArray()) return tags;
+        for (JsonNode tag : node) {
+            if (tags.size() == MAX_TAGS) break;
+            String clean = tag.asString("").toLowerCase(Locale.ROOT).strip().replace(' ', '_');
+            if (clean.matches("[a-z_]{2,24}") && !tags.contains(clean)) {
+                tags.add(clean);
+            }
+        }
+        return List.copyOf(tags);
+    }
+
+    private static String truncate(String s, int max) {
+        return s.length() <= max ? s : s.substring(0, max - 1) + "…";
     }
 }

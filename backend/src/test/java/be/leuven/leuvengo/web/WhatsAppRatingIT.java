@@ -2,7 +2,9 @@ package be.leuven.leuvengo.web;
 
 import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.repository.ReportRepository;
+import be.leuven.leuvengo.net.SafeHttpFetcher;
 import be.leuven.leuvengo.service.GeminiService;
+import be.leuven.leuvengo.whatsapp.TwilioMediaFetcher;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +17,7 @@ import java.util.Comparator;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -29,11 +32,13 @@ class WhatsAppRatingIT {
     @Autowired MockMvc mvc;
     @Autowired ReportRepository reports;
     @MockitoBean GeminiService gemini;
+    @MockitoBean TwilioMediaFetcher media;
 
     @Test
     void aFilthyPhotoIsStoredAsADirtyReport() throws Exception {
-        when(gemini.scorePhoto(anyString())).thenReturn(
-                new GeminiService.ScoreResult(false, null, 10, "Overflowing bin", List.of("plastic")));
+        when(media.fetch(anyString())).thenReturn(new SafeHttpFetcher.Download(new byte[]{1}, "image/jpeg"));
+        when(gemini.scorePhoto(any(), anyString())).thenReturn(
+                GeminiService.ScoreResult.genuine(10, "Overflowing bin", List.of("plastic")));
 
         mvc.perform(post("/api/whatsapp/webhook")
                         .param("From", "whatsapp:+32470000000")
