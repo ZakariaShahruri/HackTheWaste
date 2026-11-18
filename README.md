@@ -1,193 +1,186 @@
 # Leuven Go
 
-> **Cleanliness, gamified.** A 24-hour hackathon prototype that turns a single
-> photo + location from a citizen into an actionable Planon work order, while
-> letting students compete for their faculty's honour.
+[![CI](https://github.com/ZakariaShahruri/HackTheWaste/actions/workflows/ci.yml/badge.svg)](https://github.com/ZakariaShahruri/HackTheWaste/actions/workflows/ci.yml)
 
-Leuven Go bridges what residents *see* on the street with what city teams
-*do* about it. It ships two dashboards on the same dataset:
+**Cleanliness, gamified.** Residents send one photo and a location pin over
+WhatsApp. An AI rates how dirty the spot is, nearby reports merge into a single
+hotspot, and once enough people report the same place the city gets a work
+order. Students earn points for their faculty clan along the way.
 
-| Dashboard            | For                | Vibe                                                                                                                   |
-| -------------------- | ------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| **Professional**     | City planners      | Dark, technical. Hotspot heatmap, AI cleanliness scores per street segment, Planon work-order monitor, crew routing.   |
-| **Student**          | KU Leuven students | Warm, gamified. Faculty-coloured territories, 0–5 scoring, clan leaderboard, rewards marketplace.                      |
+Built in 24 hours by team ReCode for a KU Leuven hackathon, which it won, and
+since then hardened into something that runs for real.
 
----
+It has two views over the same data:
+
+| View             | For                | What it shows                                                                                       |
+| ---------------- | ------------------ | --------------------------------------------------------------------------------------------------- |
+| **Professional** | City teams         | Hotspots, street cleanliness scores, a predictive litter heatmap, the work-order queue for crews    |
+| **Student**      | KU Leuven students | Clan territories on the map, the clan leaderboard, a photo feed, the rewards marketplace            |
+
+## How it works
+
+```mermaid
+flowchart LR
+    WA[WhatsApp<br/>pin + photo] -->|Twilio webhook| IN
+    WEB[Browser upload] --> IN
+    IN[Ingestion] --> NORM[Re-encode photo<br/>strip EXIF]
+    NORM --> AI[Gemini<br/>score + fake check]
+    AI --> STORE[(Photo storage<br/>DB or Azure Blob)]
+    AI --> REP[Report]
+    REP --> HS[Hotspot clustering]
+    REP --> SC[Street scores]
+    REP --> PTS[Clan points]
+    HS -->|3+ reports| WO[Work order<br/>Planon mock]
+    ML[ML service<br/>FastAPI] -->|litter likelihood| PRED[Predictive heatmap]
+```
+
+1. **Report.** Over WhatsApp you send a location pin, then a photo. Without
+   WhatsApp, `POST /api/demo-reports` takes the same photo and pin from the
+   browser and runs the exact same pipeline.
+2. **Check.** The photo is re-encoded to a JPEG of at most 1280 px, which also
+   drops EXIF data such as GPS. Gemini scores it from 0 (filthy) to 100 (clean)
+   and rejects screenshots and stock photos. Pins outside Leuven are refused.
+3. **Cluster.** A report within 40 m of an open hotspot joins it; otherwise it
+   opens a new one. At 3 reports the hotspot escalates to a work order whose
+   priority depends on how dirty the spot is and how many people reported it.
+4. **Score.** Each street segment's score is a recency-weighted average of the
+   reports within 80 m, pulled towards a neutral prior so that one photo can't
+   swing a street to 0 or 100:
+
+   ```
+   score = (85 * 1 + Σ wᵢ * scoreᵢ) / (1 + Σ wᵢ)      wᵢ = 0.5 ^ (ageᵢ / 24h)
+   ```
+
+   Scores are refreshed after every report and hourly, so streets drift back
+   to the prior as reports age.
+5. **Reward.** Each report earns its clan `1 + (100 - score) / 20` points, so
+   the dirtiest spots are worth the most. Text `clan CODE` to the bot to pick
+   the clan your WhatsApp reports count for.
+6. **Predict.** A small scikit-learn model estimates how likely litter is across
+   Leuven for any weekday and hour. The backend proxies it; browsers never call
+   the ML service directly.
+
+## WhatsApp commands
+
+| Send                 | Reply                                                     |
+| -------------------- | --------------------------------------------------------- |
+| a location pin       | asks for a photo of the spot (valid for 30 minutes)       |
+| a photo (after a pin)| the AI's score, its assessment and what it spotted         |
+| `clan`               | your current clan and the list of clans                   |
+| `clan CODE`          | joins that clan, e.g. `clan APO`                          |
+
+## Security and privacy
+
+- **No phone numbers stored.** WhatsApp senders are identified by an
+  HMAC-SHA256 of their number with a server-side secret, and numbers never reach
+  the logs. The public feed labels reporters only by channel and rounds
+  coordinates to about 10 m.
+- **Webhook signatures.** Every Twilio request is checked against
+  `X-Twilio-Signature`, and unsigned requests are rejected.
+- **Safe media fetching.** Photos are downloaded only over HTTPS from Twilio's
+  own host, Twilio credentials are never forwarded on redirects, and downloads
+  are size- and type-limited. Images over 50 megapixels are refused before
+  decoding.
+- **Sessions.** Passwords are BCrypt-hashed. Session tokens are stored only as
+  SHA-256 hashes and expire after 7 days. Completing work orders requires the
+  crew role.
+- **Rate limits** on login, sign-up and browser uploads.
+- **Fail fast in production.** The prod profile refuses to start without
+  `ALLOWED_ORIGINS` and `PSEUDONYM_SECRET`.
 
 ## Stack
 
-- **Frontend** — React 18 + TypeScript + Vite, React Router, React-Leaflet for maps
-- **Backend** — Java 17 + Spring Boot 3.3 (Web, Data JPA, Validation), in-memory H2
-- **Maps** — CARTO basemaps + Leaflet (dark for pros, voyager for students)
+| Part        | Tech                                                                 |
+| ----------- | -------------------------------------------------------------------- |
+| `backend/`  | Java 21, Spring Boot 4.1, Hibernate 7; H2 in dev, Postgres in prod   |
+| `frontend/` | React 19, TypeScript, Vite 8, react-router, React-Leaflet, OSM tiles |
+| `ml/`       | Python 3.13, FastAPI, scikit-learn                                   |
+| AI          | Google Gemini (`gemini-2.5-flash-lite` by default)                   |
+| Messaging   | Twilio WhatsApp                                                      |
 
-```
-HackTheWaste/
-├── backend/   ← Spring Boot + H2
-└── frontend/  ← Vite + React + TS
-```
+## Running it locally
 
----
-
-## Quick start
-
-Two terminals, no setup beyond `mvn` + `npm`.
-
-**1. Backend**
+You need Java 21, Maven, Node 22 and Python 3.13. Nothing else: dev uses an
+in-memory H2 database and seeds itself with Leuven demo data, including a crew
+account (`crew@leuvengo.demo` / `cleanleuven`) for the operations page.
 
 ```bash
-cd backend
-mvn spring-boot:run
+# backend → http://localhost:8080
+cd backend && mvn spring-boot:run
+
+# frontend → http://localhost:5173 (proxies /api to the backend)
+cd frontend && npm install && npm run dev
+
+# ML service → http://localhost:8000 (only needed for the predictive heatmap)
+cd ml && python -m venv venv && venv/bin/pip install -r requirements.txt
+venv/bin/uvicorn api:app --port 8000
 ```
 
-→ http://localhost:8080
-- API root: `/api`
-- H2 console: `/h2-console` (jdbc:h2:mem:leuvengo, user `sa`, no password)
+If port 8080 is taken, run the backend with `--server.port=8099` and the
+frontend with `VITE_PROXY_TARGET=http://localhost:8099 npm run dev`.
 
-The app seeds itself on first boot with Leuven-specific data: faculties
-(Engineering, Law, Medicine, Arts, Economics, Science) with territories,
-twelve street segments centred on iconic spots (Oude Markt, Naamsestraat,
-Tiensestraat, Vaartkom, Heverlee Campus, Gasthuisberg…), a rewards catalogue
-(Velo passes, Alma vouchers, STUK tickets…), and a backlog of demo reports
-that already triggered Planon work orders so the dashboards have something
-to show.
+Without a `GEMINI_API_KEY`, photos still go through the pipeline but get a
+neutral score that is labelled "AI offline, demo score".
 
-**2. Frontend**
+## Configuration
+
+The backend reads environment variables (see `backend/.env.example`):
+
+| Variable                          | Needed       | Purpose                                                       |
+| --------------------------------- | ------------ | ------------------------------------------------------------- |
+| `SPRING_PROFILES_ACTIVE`          | prod         | `prod` switches to Postgres and the strict settings           |
+| `SPRING_DATASOURCE_URL` / `_USERNAME` / `_PASSWORD` | prod | Postgres connection                              |
+| `ALLOWED_ORIGINS`                 | prod         | Comma-separated frontend origins for CORS                     |
+| `PSEUDONYM_SECRET`                | prod         | HMAC key for sender pseudonyms; keep it stable                |
+| `ML_API_URL`                      | optional     | ML service, default `http://localhost:8000`                   |
+| `GEMINI_API_KEY`, `GEMINI_MODEL`  | optional     | Photo scoring                                                 |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | WhatsApp | Media downloads and webhook signatures                     |
+| `TWILIO_WEBHOOK_URL`              | WhatsApp     | The exact webhook URL configured in Twilio                    |
+| `AZURE_STORAGE_CONNECTION_STRING`, `AZURE_STORAGE_CONTAINER` | optional | Store photos in Azure Blob instead of the database |
+
+The frontend reads `VITE_API_BASE_URL`, `VITE_WHATSAPP_NUMBER` and
+`VITE_WHATSAPP_JOIN_CODE` (see `frontend/.env.example`).
+
+## API
+
+| Method | Path                                | Purpose                                          |
+| ------ | ----------------------------------- | ------------------------------------------------ |
+| POST   | `/api/whatsapp/webhook`             | Twilio webhook (signed)                          |
+| POST   | `/api/demo-reports`                 | Browser upload: `photo`, `lat`, `lng`, `clan`?   |
+| GET    | `/api/photos/{id}`                  | A stored report photo                            |
+| GET    | `/api/feed`                         | Photo feed, paged, optional `?clan=`             |
+| GET    | `/api/hotspots`, `/api/hotspots/active` | Hotspots                                     |
+| GET    | `/api/segments`                     | Street segments with their scores                |
+| GET    | `/api/faculties`                    | Clans with their territories                     |
+| GET    | `/api/leaderboard`                  | Clans ranked by points                           |
+| GET    | `/api/stats`                        | Dashboard figures and the 7-day trend            |
+| GET    | `/api/predictions/grid`             | Litter likelihood grid, `?day=0..6&hour=0..23`   |
+| GET    | `/api/rewards`                      | Rewards marketplace                              |
+| GET    | `/api/work-orders`                  | Work orders                                      |
+| POST   | `/api/work-orders/{id}/complete`    | Crew only: resolves the hotspot                  |
+| POST   | `/api/work-orders/dispatch/{hotspotId}` | Escalate a hotspot by hand                   |
+| POST   | `/api/auth/register`, `/login`, `/logout` | Accounts                               |
+| GET    | `/api/auth/me`                      | The logged-in user                               |
+
+Errors always come back as the same JSON shape (`status`, `error`, `message`,
+`path`, `timestamp`), never as stack traces.
+
+## Tests
 
 ```bash
-cd frontend
-npm install
-npm run dev
+cd backend  && mvn clean verify                       # unit + integration tests
+cd frontend && npm run lint && npm run typecheck && npm test && npm run build
+cd ml       && pip install -r requirements-dev.txt && pytest
 ```
 
-→ http://localhost:5173
+GitHub Actions runs all three on every push.
 
-Vite proxies `/api` to `localhost:8080`, so no CORS hoops in dev.
+## Limitations
 
----
-
-## What's wired up
-
-### Pages
-
-- `/` — **Landing** with role selection, stats, and the 6-step explainer
-- `/pro` — **Professional Dashboard**: heatmap, KPIs, 7-day trend, top clusters, segment ranking by AI score, recent Planon orders
-- `/pro/operations` — Crew **operations queue**, complete a work order to resolve its hotspot
-- `/student` — **Student Dashboard**: faculty territories on the map, picker for "your clan", clan rankings, dirtiest streets near you
-- `/student/leaderboard` — Full **clan leaderboard** with progress bars
-- `/report` — **One-message reporting**: rating · photo · location · tags · clan
-- `/market` — **Rewards marketplace** filtered by category
-
-### REST API (selected)
-
-| Method | Path                                  | Purpose                                       |
-| ------ | ------------------------------------- | --------------------------------------------- |
-| POST   | `/api/reports`                        | Submit a one-message report                   |
-| GET    | `/api/reports/recent`                 | 50 most recent reports                        |
-| GET    | `/api/hotspots`                       | All hotspots, sorted by report count          |
-| GET    | `/api/hotspots/active`                | Open + escalated + dispatched only            |
-| GET    | `/api/segments`                       | Street segments with current AI scores        |
-| GET    | `/api/faculties`                      | Faculties (clans) with territory GeoJSON      |
-| GET    | `/api/leaderboard`                    | Ranked clans with running totals              |
-| GET    | `/api/work-orders`                    | Recent Planon work orders                     |
-| POST   | `/api/work-orders/{id}/complete`      | Mark order completed → resolves hotspot       |
-| POST   | `/api/work-orders/dispatch/{hsId}`    | Manually escalate a hotspot to Planon         |
-| GET    | `/api/rewards`                        | Marketplace items                             |
-| GET    | `/api/stats`                          | Dashboard KPIs + 7-day trend + top hotspots   |
-| GET    | `/api/stats/city`                     | City config (centre, thresholds)              |
-
----
-
-## Core logic
-
-### Traffic Logic — *prevent duplicate work orders*
-
-`TrafficService` collapses any incoming report into the nearest **open** hotspot
-inside `clusterRadiusM` (default **40 m**). Centroid is updated as a weighted
-mean, severity as a running mean of citizen 0-5 ratings. If no open hotspot is
-within range, a fresh one is opened.
-
-A hotspot auto-escalates to a Planon work order once it crosses
-`workOrderThreshold` reports (default **3**). Statuses flow:
-
-```
-OPEN → ESCALATED → DISPATCHED → RESOLVED
-```
-
-Idempotent — re-dispatching the same hotspot reuses the existing order.
-
-### AI cleanliness score — 0-100 per segment
-
-`ScoringService` recomputes after each new report. For each segment we sum a
-recency-decayed penalty over reports within an 80 m radius: filthier ratings
-penalise harder, recency follows a 24-hour half-life, score floors at 0 and
-caps at 100. The interface is identical to what an image-classifier model
-would produce, so swapping in a vision model is a drop-in change.
-
-### Planon integration
-
-`PlanonService.dispatch()` builds a `WorkOrder` (priority is derived from
-severity + cluster size, crew is routed by district) and calls a
-mock REST endpoint. The actual HTTP call is stubbed but the call site is
-explicit so production can plug in `RestClient` against Planon's
-`/Order/Create` endpoint. The Planon ref is persisted on the order.
-
-### GDPR posture
-
-- No PII stored. Reporters get a **rotating session pseudo-id** (e.g.
-  `pid-x7y2z3a8`) generated client-side and stored in `sessionStorage`.
-- **Photos are never persisted as raw bytes** — the frontend hashes them and
-  sends only an opaque `imageRef` fingerprint. Production would forward the
-  bytes to a private object store + classifier and persist only the resulting
-  derived signal tags.
-- Backend stores **only derived metrics** (rating, severity, tag string,
-  geo metadata, recency). No phone numbers, no emails, no IPs in domain
-  tables.
-- Cluster radius and recency-window are tunable in `application.yml`.
-
-### Leuven flavour
-
-- Demo segments cover Oude Markt, Naamsestraat, Tiensestraat, Bondgenotenlaan,
-  Brusselsestraat, Diestsestraat, Vaartkom, Heverlee Campus, Gasthuisberg,
-  Sint-Maartensdal, Parkstraat, Kessel-Lo Station.
-- Demo reports cluster around Oude Markt (party residue) and student housing
-  near Naamsestraat — exactly the spots that surge with the academic
-  calendar. Tweak `cluster-radius-m` and `work-order-threshold` to model
-  seasonal population shifts.
-
----
-
-## Tunables (`backend/src/main/resources/application.yml`)
-
-```yaml
-leuvengo:
-  traffic:
-    cluster-radius-m: 40        # how close two reports must be to merge
-    report-ttl-hours: 72        # decay window
-    work-order-threshold: 3     # auto-dispatch after N merged reports
-  planon:
-    base-url: http://localhost:8080/mock-planon
-    api-key: demo-key
-  city:
-    name: Leuven
-    centerLat: 50.8798
-    centerLng: 4.7005
-```
-
----
-
-## Build commands
-
-```bash
-# Backend
-mvn -f backend/pom.xml -DskipTests package
-
-# Frontend
-cd frontend && npm run build
-```
-
-Both produce deployable artefacts (`backend/target/leuven-go-0.1.0.jar`,
-`frontend/dist/`).
-
----
-
-Made for Leuven. ♻️
+- **The ML model is trained on synthetic data**, generated from a hand-written
+  prior about when and where Leuven gets messy (nightlife, markets, student
+  areas). It shows the pipeline, not real-world accuracy.
+- **Planon is mocked.** Work orders get a Planon-style reference, but nothing is
+  sent to a real Planon instance.
+- **Rate limits are in memory**, so they are per instance. That's fine for a
+  single-instance deployment.
