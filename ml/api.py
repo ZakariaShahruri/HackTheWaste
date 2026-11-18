@@ -15,10 +15,10 @@ from datetime import datetime
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 import model_io
-from features import build_features
+from features import LAT_RANGE, LNG_RANGE, build_features
 
 rf, MODEL_METRICS = model_io.load()
 
@@ -41,9 +41,17 @@ def parse_time(value: str) -> datetime:
 app = FastAPI(title="Leuven Trash Likelihood API", version="1.0.0")
 
 
+def latitude(default=...):
+    return Field(default, ge=LAT_RANGE[0], le=LAT_RANGE[1])
+
+
+def longitude(default=...):
+    return Field(default, ge=LNG_RANGE[0], le=LNG_RANGE[1])
+
+
 class PredictRequest(BaseModel):
-    latitude:  float = Field(..., ge=50.7, le=51.0)
-    longitude: float = Field(..., ge=4.5,  le=4.9)
+    latitude:  float = latitude()
+    longitude: float = longitude()
     time: str = Field(
         ..., description="ISO-8601 timestamp, e.g. 2026-05-09T22:00:00"
     )
@@ -62,12 +70,18 @@ class BatchRequest(BaseModel):
 
 class GridRequest(BaseModel):
     time: str = Field(..., description="ISO-8601 timestamp")
-    lat_min:  float = Field(50.855, ge=50.7, le=51.0)
-    lat_max:  float = Field(50.905, ge=50.7, le=51.0)
-    lng_min:  float = Field(4.670,  ge=4.5,  le=4.9)
-    lng_max:  float = Field(4.730,  ge=4.5,  le=4.9)
+    lat_min:  float = latitude(50.855)
+    lat_max:  float = latitude(50.905)
+    lng_min:  float = longitude(4.670)
+    lng_max:  float = longitude(4.730)
     lat_steps: int  = Field(30, ge=5, le=100)
     lng_steps: int  = Field(30, ge=5, le=100)
+
+    @model_validator(mode="after")
+    def min_below_max(self):
+        if self.lat_min >= self.lat_max or self.lng_min >= self.lng_max:
+            raise ValueError("lat_min and lng_min must be below lat_max and lng_max")
+        return self
 
 
 @app.get("/health")

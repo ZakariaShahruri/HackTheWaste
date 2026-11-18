@@ -9,6 +9,10 @@ import pandas as pd
 LEUVEN_TZ = "Europe/Brussels"
 LEUVEN_CENTER = (50.8798, 4.7005)
 
+# The area the training data covers; anything outside it would be a guess.
+LAT_RANGE = (50.85, 50.91)
+LNG_RANGE = (4.66, 4.75)
+
 HOTSPOTS = {
     "oude_markt":      (50.8793, 4.7005),
     "station":         (50.8820, 4.7163),

@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from api import app
@@ -67,3 +68,32 @@ def test_a_utc_time_is_scored_as_the_same_moment_in_leuven():
 
     assert likelihood("2026-11-21T22:00:00Z") == likelihood("2026-11-21T23:00:00")
     assert likelihood("2026-11-21T22:00:00Z") != likelihood("2026-11-21T22:00:00")
+
+
+@pytest.mark.parametrize("bounds", [
+    {"lat_min": 50.90, "lat_max": 50.86},
+    {"lng_min": 4.72, "lng_max": 4.68},
+    {"lat_min": 50.88, "lat_max": 50.88},
+])
+def test_a_grid_with_inverted_or_empty_bounds_is_rejected(bounds):
+    resp = client.post("/predict/grid", json={"time": NOON, **bounds})
+    assert resp.status_code == 422
+
+
+@pytest.mark.parametrize("bounds", [
+    {"lat_min": 50.70},  # Brussels-ish, far outside the training data
+    {"lng_max": 4.90},
+])
+def test_a_grid_reaching_outside_the_training_area_is_rejected(bounds):
+    resp = client.post("/predict/grid", json={"time": NOON, **bounds})
+    assert resp.status_code == 422
+
+
+def test_too_many_grid_steps_are_rejected():
+    resp = client.post("/predict/grid", json={"time": NOON, "lat_steps": 500})
+    assert resp.status_code == 422
+
+
+def test_points_just_outside_the_training_area_are_rejected():
+    resp = client.post("/predict", json={"latitude": 50.80, "longitude": 4.70, "time": NOON})
+    assert resp.status_code == 422
