@@ -1,6 +1,6 @@
 package be.leuven.leuvengo.service;
 
-import be.leuven.leuvengo.config.AppProperties;
+import be.leuven.leuvengo.config.LeuvenGoProperties;
 import be.leuven.leuvengo.domain.Hotspot;
 import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.domain.StreetSegment;
@@ -23,11 +23,11 @@ public class TrafficService {
 
     private final HotspotRepository hotspots;
     private final StreetSegmentRepository segments;
-    private final AppProperties props;
+    private final LeuvenGoProperties props;
 
     public TrafficService(HotspotRepository hotspots,
                           StreetSegmentRepository segments,
-                          AppProperties props) {
+                          LeuvenGoProperties props) {
         this.hotspots = hotspots;
         this.segments = segments;
         this.props = props;
@@ -47,7 +47,7 @@ public class TrafficService {
         for (Hotspot h : open) {
             double d = GeoUtil.distanceMeters(
                     report.getLat(), report.getLng(), h.getCenterLat(), h.getCenterLng());
-            if (d <= props.getTraffic().getClusterRadiusM() && d < bestDist) {
+            if (d <= props.traffic().clusterRadiusM() && d < bestDist) {
                 best = h;
                 bestDist = d;
             }

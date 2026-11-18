@@ -1,6 +1,8 @@
 package be.leuven.leuvengo.domain;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "faculty")
@@ -13,14 +15,15 @@ public class Faculty {
     @Column(nullable = false, unique = true)
     private String name;
 
+    @Column(nullable = false, unique = true, length = 10)
     private String shortCode;
     private String color;
     private String emoji;
     private Integer members;
     private Integer points;
 
-    @Lob
-    @Column(name = "territory_geojson", columnDefinition = "CLOB")
+    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
+    @Column(name = "territory_geojson")
     private String territoryGeoJson;
 
     public Long getId() { return id; }

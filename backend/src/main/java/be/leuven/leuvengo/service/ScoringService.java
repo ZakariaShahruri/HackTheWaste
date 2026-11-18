@@ -1,6 +1,6 @@
 package be.leuven.leuvengo.service;
 
-import be.leuven.leuvengo.config.AppProperties;
+import be.leuven.leuvengo.config.LeuvenGoProperties;
 import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.domain.StreetSegment;
 import be.leuven.leuvengo.repository.ReportRepository;
@@ -28,11 +28,11 @@ public class ScoringService {
 
     private final ReportRepository reports;
     private final StreetSegmentRepository segments;
-    private final AppProperties props;
+    private final LeuvenGoProperties props;
 
     public ScoringService(ReportRepository reports,
                           StreetSegmentRepository segments,
-                          AppProperties props) {
+                          LeuvenGoProperties props) {
         this.reports = reports;
         this.segments = segments;
         this.props = props;
@@ -40,7 +40,7 @@ public class ScoringService {
 
     @Transactional
     public void recomputeAll() {
-        Instant since = Instant.now().minus(props.getTraffic().getReportTtlHours(), ChronoUnit.HOURS);
+        Instant since = Instant.now().minus(props.traffic().reportTtlHours(), ChronoUnit.HOURS);
         List<Report> recent = reports.findRecent(since);
         for (StreetSegment seg : segments.findAll()) {
             double score = scoreFor(seg, recent);

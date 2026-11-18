@@ -1,9 +1,12 @@
 package be.leuven.leuvengo.web.error;
 
+import be.leuven.leuvengo.config.LeuvenGoProperties;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -20,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = ApiExceptionHandlerTest.ThrowingController.class)
-@Import(ApiExceptionHandlerTest.ThrowingController.class)
+@Import({ApiExceptionHandlerTest.ThrowingController.class, ApiExceptionHandlerTest.PropertiesConfig.class})
 class ApiExceptionHandlerTest {
 
     @Autowired
@@ -77,6 +80,10 @@ class ApiExceptionHandlerTest {
                 .andExpect(status().isMethodNotAllowed())
                 .andExpect(jsonPath("$.status").value(405));
     }
+
+    @TestConfiguration
+    @EnableConfigurationProperties(LeuvenGoProperties.class)
+    static class PropertiesConfig {}
 
     record NamedThing(@NotBlank String name) {}
 

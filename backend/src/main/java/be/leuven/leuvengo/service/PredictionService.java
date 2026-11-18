@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import be.leuven.leuvengo.config.LeuvenGoProperties;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -27,8 +27,11 @@ public class PredictionService {
     private static final Logger log = LoggerFactory.getLogger(PredictionService.class);
     private static final DateTimeFormatter ISO = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
-    @Value("${ml.api-url:http://localhost:8000}")
-    private String mlApiUrl;
+    private final String mlApiUrl;
+
+    public PredictionService(LeuvenGoProperties props) {
+        this.mlApiUrl = props.ml().apiUrl();
+    }
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(2))

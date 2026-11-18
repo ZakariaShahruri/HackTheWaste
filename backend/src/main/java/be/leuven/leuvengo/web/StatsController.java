@@ -1,6 +1,5 @@
 package be.leuven.leuvengo.web;
 
-import be.leuven.leuvengo.config.AppProperties;
 import be.leuven.leuvengo.domain.Hotspot;
 import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.domain.WorkOrder;
@@ -28,25 +27,22 @@ public class StatsController {
     private final HotspotRepository hotspots;
     private final WorkOrderRepository workOrders;
     private final StreetSegmentRepository segments;
-    private final AppProperties props;
 
     public StatsController(ReportRepository reports, HotspotRepository hotspots,
-                           WorkOrderRepository workOrders, StreetSegmentRepository segments,
-                           AppProperties props) {
+                           WorkOrderRepository workOrders, StreetSegmentRepository segments) {
         this.reports = reports;
         this.hotspots = hotspots;
         this.workOrders = workOrders;
         this.segments = segments;
-        this.props = props;
     }
 
     @GetMapping
     public Dtos.StatsDto stats() {
         long total = reports.count();
-        long open = hotspots.findAllByStatusIn(
-                List.of(Hotspot.Status.OPEN, Hotspot.Status.ESCALATED)).size();
-        long dispatched = workOrders.findByStatus(WorkOrder.Status.DISPATCHED).size();
-        long completed = workOrders.findByStatus(WorkOrder.Status.COMPLETED).size();
+        long open = hotspots.countByStatusIn(
+                List.of(Hotspot.Status.OPEN, Hotspot.Status.ESCALATED));
+        long dispatched = workOrders.countByStatus(WorkOrder.Status.DISPATCHED);
+        long completed = workOrders.countByStatus(WorkOrder.Status.COMPLETED);
 
         double avg = segments.findAll().stream()
                 .mapToDouble(s -> s.getAiCleanlinessScore() == null ? 70 : s.getAiCleanlinessScore())
@@ -57,17 +53,6 @@ public class StatsController {
                 Math.round(avg * 10.0) / 10.0,
                 last7Days(),
                 topHotspots());
-    }
-
-    @GetMapping("/city")
-    public Map<String, Object> city() {
-        Map<String, Object> m = new HashMap<>();
-        m.put("name", props.getCity().getName());
-        m.put("centerLat", props.getCity().getCenterLat());
-        m.put("centerLng", props.getCity().getCenterLng());
-        m.put("clusterRadiusM", props.getTraffic().getClusterRadiusM());
-        m.put("workOrderThreshold", props.getTraffic().getWorkOrderThreshold());
-        return m;
     }
 
     private List<Dtos.TimeBucket> last7Days() {
@@ -89,12 +74,7 @@ public class StatsController {
     }
 
     private List<Dtos.HotspotDto> topHotspots() {
-        return hotspots.findAll().stream()
-                .filter(h -> h.getStatus() != Hotspot.Status.RESOLVED)
-                .sorted((a, b) -> Integer.compare(
-                        b.getReportCount() == null ? 0 : b.getReportCount(),
-                        a.getReportCount() == null ? 0 : a.getReportCount()))
-                .limit(5)
+        return hotspots.findTop5ByStatusNotOrderByReportCountDesc(Hotspot.Status.RESOLVED).stream()
                 .map(Dtos::of)
                 .toList();
     }

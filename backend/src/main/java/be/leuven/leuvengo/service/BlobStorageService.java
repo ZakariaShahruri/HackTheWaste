@@ -7,7 +7,7 @@ import com.azure.storage.blob.models.BlobHttpHeaders;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import be.leuven.leuvengo.config.LeuvenGoProperties;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
@@ -25,17 +25,17 @@ public class BlobStorageService {
 
     private static final Logger log = LoggerFactory.getLogger(BlobStorageService.class);
 
-    @Value("${azure.storage.connection-string:}")
-    private String connectionString;
+    private final String connectionString;
+    private final String containerName;
+    private final String twilioAccountSid;
+    private final String twilioAuthToken;
 
-    @Value("${azure.storage.container:trash-photos}")
-    private String containerName;
-
-    @Value("${twilio.account-sid:}")
-    private String twilioAccountSid;
-
-    @Value("${twilio.auth-token:}")
-    private String twilioAuthToken;
+    public BlobStorageService(LeuvenGoProperties props) {
+        this.connectionString = props.storage().azureConnectionString();
+        this.containerName = props.storage().azureContainer();
+        this.twilioAccountSid = props.twilio().accountSid();
+        this.twilioAuthToken = props.twilio().authToken();
+    }
 
     private BlobContainerClient containerClient;
 

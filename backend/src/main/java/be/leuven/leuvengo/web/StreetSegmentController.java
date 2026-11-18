@@ -20,6 +20,6 @@ public class StreetSegmentController {
 
     @GetMapping
     public List<Dtos.StreetSegmentDto> list() {
-        return segments.findAll().stream().map(Dtos::of).toList();
+        return segments.findAllByOrderByNameAsc().stream().map(Dtos::of).toList();
     }
 }

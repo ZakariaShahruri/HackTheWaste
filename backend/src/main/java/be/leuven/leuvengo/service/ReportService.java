@@ -1,6 +1,6 @@
 package be.leuven.leuvengo.service;
 
-import be.leuven.leuvengo.config.AppProperties;
+import be.leuven.leuvengo.config.LeuvenGoProperties;
 import be.leuven.leuvengo.domain.Faculty;
 import be.leuven.leuvengo.domain.Hotspot;
 import be.leuven.leuvengo.domain.Report;
@@ -20,14 +20,14 @@ public class ReportService {
     private final TrafficService traffic;
     private final ScoringService scoring;
     private final PlanonService planon;
-    private final AppProperties props;
+    private final LeuvenGoProperties props;
 
     public ReportService(ReportRepository reports,
                          FacultyRepository faculties,
                          TrafficService traffic,
                          ScoringService scoring,
                          PlanonService planon,
-                         AppProperties props) {
+                         LeuvenGoProperties props) {
         this.reports = reports;
         this.faculties = faculties;
         this.traffic = traffic;
@@ -71,7 +71,7 @@ public class ReportService {
         Hotspot h = traffic.ingest(saved);
 
         // Auto-escalate to Planon when threshold crossed.
-        int threshold = props.getTraffic().getWorkOrderThreshold();
+        int threshold = props.traffic().workOrderThreshold();
         if (h.getStatus() == Hotspot.Status.OPEN
                 && h.getReportCount() != null
                 && h.getReportCount() >= threshold) {

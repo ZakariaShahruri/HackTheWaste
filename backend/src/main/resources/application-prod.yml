@@ -7,13 +7,12 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    database-platform: org.hibernate.dialect.PostgreSQLDialect
-    properties:
-      hibernate:
-        format_sql: false
   h2:
     console:
       enabled: false
 
-allowed:
-  origins: ${ALLOWED_ORIGINS:https://localhost}
+leuvengo:
+  cors:
+    # No fallback on purpose: a prod deploy without ALLOWED_ORIGINS should fail
+    # at startup rather than silently block every browser request.
+    allowed-origins: ${ALLOWED_ORIGINS}

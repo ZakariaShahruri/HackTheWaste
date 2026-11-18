@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import be.leuven.leuvengo.config.LeuvenGoProperties;
 import org.springframework.stereotype.Service;
 
 import java.net.URI;
@@ -40,14 +40,15 @@ public class GeminiService {
             + "Tags must name visible waste types such as plastic, glass, paper, food_waste, cigarettes. "
             + "Include at most 3 tags. If fake, tags may be empty.";
 
-    @Value("${gemini.api-key:}")
-    private String apiKey;
+    private final String apiKey;
+    private final String twilioAccountSid;
+    private final String twilioAuthToken;
 
-    @Value("${twilio.account-sid:}")
-    private String twilioAccountSid;
-
-    @Value("${twilio.auth-token:}")
-    private String twilioAuthToken;
+    public GeminiService(LeuvenGoProperties props) {
+        this.apiKey = props.gemini().apiKey();
+        this.twilioAccountSid = props.twilio().accountSid();
+        this.twilioAuthToken = props.twilio().authToken();
+    }
 
     private final HttpClient http = HttpClient.newBuilder()
             .followRedirects(HttpClient.Redirect.NORMAL)

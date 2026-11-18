@@ -21,10 +21,7 @@ public class HotspotController {
 
     @GetMapping
     public List<Dtos.HotspotDto> list() {
-        return hotspots.findAll().stream()
-                .sorted((a, b) -> Integer.compare(
-                        b.getReportCount() == null ? 0 : b.getReportCount(),
-                        a.getReportCount() == null ? 0 : a.getReportCount()))
+        return hotspots.findAllByOrderByReportCountDesc().stream()
                 .map(Dtos::of)
                 .toList();
     }
