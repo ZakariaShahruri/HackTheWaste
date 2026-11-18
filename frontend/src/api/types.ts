@@ -74,6 +74,8 @@ export interface RewardItemDto {
 }
 
 export interface TimeBucket {
+  /** ISO date (Europe/Brussels calendar day). */
+  date: string;
   label: string;
   count: number;
 }

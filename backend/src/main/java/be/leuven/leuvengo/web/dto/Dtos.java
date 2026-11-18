@@ -43,7 +43,8 @@ public final class Dtos {
                            List<TimeBucket> reportsLast7Days,
                            List<HotspotDto> topHotspots) {}
 
-    public record TimeBucket(String label, long count) {}
+    /** One calendar day (Europe/Brussels): ISO date plus a short label. */
+    public record TimeBucket(String date, String label, long count) {}
 
     public record TrashPhotoDto(
             Long id, String username, String email,

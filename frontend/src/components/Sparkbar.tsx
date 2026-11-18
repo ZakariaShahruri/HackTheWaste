@@ -7,7 +7,7 @@ export function Sparkbar({ data }: { data: TimeBucket[] }) {
     <div className="sparkbar">
       {data.map((d) => (
         <div
-          key={d.label}
+          key={d.date}
           style={{ height: `${(d.count / max) * 100}%` }}
           title={`${d.label}: ${d.count}`}
         >
