@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
@@ -26,27 +27,34 @@ public class PlanonService {
 
     private final WorkOrderRepository workOrders;
     private final HotspotRepository hotspots;
+    private final Clock clock;
 
-    public PlanonService(WorkOrderRepository workOrders, HotspotRepository hotspots) {
+    public PlanonService(WorkOrderRepository workOrders, HotspotRepository hotspots, Clock clock) {
         this.workOrders = workOrders;
         this.hotspots = hotspots;
+        this.clock = clock;
+    }
+
+    @Transactional
+    public WorkOrder dispatch(Hotspot hotspot) {
+        return dispatch(hotspot, clock.instant());
     }
 
     /** Idempotent: if the hotspot is already escalated/dispatched, return existing order. */
     @Transactional
-    public WorkOrder dispatch(Hotspot hotspot) {
+    public WorkOrder dispatch(Hotspot hotspot, Instant at) {
         if (hotspot.getStatus() == Hotspot.Status.DISPATCHED ||
                 hotspot.getStatus() == Hotspot.Status.RESOLVED) {
             return workOrders.findAll().stream()
                     .filter(w -> w.getHotspot() != null
                             && w.getHotspot().getId().equals(hotspot.getId()))
                     .findFirst()
-                    .orElseGet(() -> createOrder(hotspot));
+                    .orElseGet(() -> createOrder(hotspot, at));
         }
-        return createOrder(hotspot);
+        return createOrder(hotspot, at);
     }
 
-    private WorkOrder createOrder(Hotspot h) {
+    private WorkOrder createOrder(Hotspot h, Instant at) {
         WorkOrder w = new WorkOrder();
         w.setHotspot(h);
         w.setPriority(priorityFor(h));
@@ -56,17 +64,17 @@ public class PlanonService {
                 h.getReportCount(),
                 h.getMeanCleanliness() == null ? 0 : h.getMeanCleanliness(),
                 h.getLabel() == null ? "Leuven" : h.getLabel()));
-        w.setCreatedAt(Instant.now());
+        w.setCreatedAt(at);
         WorkOrder saved = workOrders.save(w);
 
         // Mock the actual Planon REST call.
         String ref = callPlanonRest(saved);
         saved.setPlanonRef(ref);
         saved.setStatus(WorkOrder.Status.DISPATCHED);
-        saved.setDispatchedAt(Instant.now());
+        saved.setDispatchedAt(at);
 
         h.setStatus(Hotspot.Status.DISPATCHED);
-        h.setLastUpdatedAt(Instant.now());
+        h.setLastUpdatedAt(at);
         hotspots.save(h);
 
         return workOrders.save(saved);

@@ -48,9 +48,11 @@ class TrafficServiceTest {
     void firstReportOpensAHotspotNamedAfterTheNearestStreet() {
         when(hotspots.findAllByStatusIn(anyCollection())).thenReturn(List.of());
 
-        Hotspot h = traffic.ingest(report(LAT + TEN_METERS_LAT, LNG, 30));
+        Report r = report(LAT + TEN_METERS_LAT, LNG, 30);
+        Hotspot h = traffic.ingest(r);
 
         assertThat(h.getStatus()).isEqualTo(Hotspot.Status.OPEN);
+        assertThat(h.getCreatedAt()).isEqualTo(r.getReportedAt());
         assertThat(h.getReportCount()).isEqualTo(1);
         assertThat(h.getMeanCleanliness()).isEqualTo(30);
         assertThat(h.getLabel()).isEqualTo("Oude Markt");

@@ -12,6 +12,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -31,6 +35,7 @@ class ReportPipelineIT {
     @Autowired StreetSegmentRepository segments;
     @Autowired FacultyRepository faculties;
     @Autowired WorkOrderRepository workOrders;
+    @Autowired Clock clock;
 
     @Test
     void thirdNearbyReportEscalatesToAPlanonWorkOrder() {
@@ -70,6 +75,28 @@ class ReportPipelineIT {
     }
 
     @Test
+    void backdatedReportsDateTheirHotspotAndWorkOrderToo() {
+        Instant first = clock.instant().minus(Duration.ofDays(2));
+        Instant third = first.plus(Duration.ofHours(2));
+
+        submitAt(10, first);
+        submitAt(15, first.plus(Duration.ofHours(1)));
+        Report last = submitAt(5, third);
+
+        Hotspot hotspot = last.getHotspot();
+        assertThat(last.getReportedAt()).isEqualTo(third);
+        assertThat(hotspot.getCreatedAt()).isEqualTo(first);
+        assertThat(hotspot.getLastUpdatedAt()).isEqualTo(third);
+        assertThat(workOrders.findAll())
+                .filteredOn(w -> w.getHotspot().getId().equals(hotspot.getId()))
+                .singleElement()
+                .satisfies(w -> {
+                    assertThat(w.getCreatedAt()).isEqualTo(third);
+                    assertThat(w.getDispatchedAt()).isEqualTo(third);
+                });
+    }
+
+    @Test
     void filthyReportsLowerTheStreetScore() {
         StreetSegment street = gasthuisberg();
         double before = street.getAiCleanlinessScore();
@@ -91,8 +118,16 @@ class ReportPipelineIT {
     }
 
     private Report submit(int score) {
-        return reportService.submit(new ReportService.Submission(
-                LAT, LNG, score, Report.Source.WEB, Reporter.anonymous("test-reporter", "FAR"), ReportService.Evidence.NONE));
+        return reportService.submit(submission(score));
+    }
+
+    private Report submitAt(int score, Instant at) {
+        return reportService.submit(submission(score), at);
+    }
+
+    private static ReportService.Submission submission(int score) {
+        return new ReportService.Submission(
+                LAT, LNG, score, Report.Source.WEB, Reporter.anonymous("test-reporter", "FAR"), ReportService.Evidence.NONE);
     }
 
     @Test

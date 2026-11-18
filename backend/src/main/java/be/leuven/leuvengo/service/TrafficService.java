@@ -9,7 +9,6 @@ import be.leuven.leuvengo.repository.StreetSegmentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.Optional;
 
 /**
@@ -66,8 +65,8 @@ public class TrafficService {
         h.setMeanCleanliness(report.getCleanlinessScore().doubleValue());
         h.setReportCount(1);
         h.setStatus(Hotspot.Status.OPEN);
-        h.setCreatedAt(Instant.now());
-        h.setLastUpdatedAt(Instant.now());
+        h.setCreatedAt(report.getReportedAt());
+        h.setLastUpdatedAt(report.getReportedAt());
         StreetSegment segment = nearestSegment(report.getLat(), report.getLng()).orElse(null);
         h.setStreetSegment(segment);
         h.setLabel(segment != null ? segment.getName() : "Leuven");
@@ -86,7 +85,7 @@ public class TrafficService {
         h.setCenterLng(lng);
         h.setReportCount(next);
         h.setMeanCleanliness(mean);
-        h.setLastUpdatedAt(Instant.now());
+        h.setLastUpdatedAt(r.getReportedAt());
     }
 
     private Optional<StreetSegment> nearestSegment(double lat, double lng) {

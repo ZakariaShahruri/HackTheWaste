@@ -10,6 +10,7 @@ import be.leuven.leuvengo.repository.ReportRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -24,6 +25,7 @@ public class ReportService {
     private final ScoringService scoring;
     private final PlanonService planon;
     private final LeuvenGoProperties props;
+    private final Clock clock;
 
     public ReportService(ReportRepository reports,
                          FacultyRepository faculties,
@@ -31,7 +33,8 @@ public class ReportService {
                          TrafficService traffic,
                          ScoringService scoring,
                          PlanonService planon,
-                         LeuvenGoProperties props) {
+                         LeuvenGoProperties props,
+                         Clock clock) {
         this.reports = reports;
         this.faculties = faculties;
         this.users = users;
@@ -39,6 +42,7 @@ public class ReportService {
         this.scoring = scoring;
         this.planon = planon;
         this.props = props;
+        this.clock = clock;
     }
 
     /** A report entering the pipeline. {@code cleanlinessScore} is 0-100 (100 = clean). */
@@ -57,6 +61,12 @@ public class ReportService {
 
     @Transactional
     public Report submit(Submission s) {
+        return submit(s, clock.instant());
+    }
+
+    /** Files the report as if it came in at {@code reportedAt}, so demo history lines up in time. */
+    @Transactional
+    public Report submit(Submission s, Instant reportedAt) {
         validate(s);
 
         Evidence evidence = s.evidence() == null ? Evidence.NONE : s.evidence();
@@ -70,7 +80,7 @@ public class ReportService {
         r.setNote(truncate(evidence.note(), 500));
         r.setSignalTags(evidence.tags() == null || evidence.tags().isEmpty()
                 ? null : truncate(String.join(",", evidence.tags()), 200));
-        r.setReportedAt(Instant.now());
+        r.setReportedAt(reportedAt);
         Reporter who = s.reporter();
         r.setReporterPseudoId(who.pseudoId() != null ? who.pseudoId()
                 : "anon-" + UUID.randomUUID().toString().substring(0, 8));
@@ -96,7 +106,7 @@ public class ReportService {
                 && h.getReportCount() != null
                 && h.getReportCount() >= threshold) {
             h.setStatus(Hotspot.Status.ESCALATED);
-            planon.dispatch(h);
+            planon.dispatch(h, reportedAt);
         }
 
         scoring.recomputeNear(saved.getLat(), saved.getLng());

@@ -9,6 +9,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -26,19 +27,22 @@ public class ScoringService {
     private final ReportRepository reports;
     private final StreetSegmentRepository segments;
     private final LeuvenGoProperties props;
+    private final Clock clock;
 
     public ScoringService(ReportRepository reports,
                           StreetSegmentRepository segments,
-                          LeuvenGoProperties props) {
+                          LeuvenGoProperties props,
+                          Clock clock) {
         this.reports = reports;
         this.segments = segments;
         this.props = props;
+        this.clock = clock;
     }
 
     /** Re-scores only the segments a report at this point can influence. */
     @Transactional
     public void recomputeNear(double lat, double lng) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         for (StreetSegment seg : segments.findAll()) {
             if (hasCentre(seg)
                     && GeoUtil.distanceMeters(lat, lng, seg.getCenterLat(), seg.getCenterLng()) <= SEGMENT_RADIUS_M) {
@@ -57,7 +61,7 @@ public class ScoringService {
     @Scheduled(cron = "${leuvengo.scoring.refresh-cron:0 0 * * * *}")
     @Transactional
     public void recomputeAll() {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         List<Report> recent = reports.findByReportedAtGreaterThanEqual(windowStart(now));
         for (StreetSegment seg : segments.findAll()) {
             if (hasCentre(seg)) rescore(seg, recent, now);
