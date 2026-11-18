@@ -2,6 +2,7 @@ package be.leuven.leuvengo.security;
 
 import be.leuven.leuvengo.domain.AppUser;
 import be.leuven.leuvengo.domain.Hotspot;
+import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.domain.WorkOrder;
 import be.leuven.leuvengo.repository.AppUserRepository;
 import be.leuven.leuvengo.repository.WorkOrderRepository;
@@ -146,7 +147,7 @@ class AuthIT {
 
     private WorkOrder dispatchedOrder() {
         for (int i = 0; i < 3; i++) {
-            reports.submit(new ReportService.Submission(50.8525, 4.6720, 10, null, null, null, null, "t"));
+            reports.submit(new ReportService.Submission(50.8525, 4.6720, 10, Report.Source.WEB, "t", null, null));
         }
         return workOrders.findAll().stream()
                 .filter(w -> w.getStatus() == WorkOrder.Status.DISPATCHED)

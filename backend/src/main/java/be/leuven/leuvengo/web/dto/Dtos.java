@@ -46,12 +46,15 @@ public final class Dtos {
     /** One calendar day (Europe/Brussels): ISO date plus a short label. */
     public record TimeBucket(String date, String label, long count) {}
 
-    /** Public feed item: no personal data, coordinates rounded to roughly 10 m. */
-    public record TrashPhotoDto(
+    /**
+     * One photo report in the public feed: no personal data, and coordinates
+     * rounded to roughly 10 m.
+     */
+    public record FeedItemDto(
             Long id, String username,
             String facultyShortCode, String facultyEmoji, String facultyColor,
             String photoUrl, Double lat, Double lng, String segmentName,
-            Integer cleanlinessScore, Integer userRating, String tags,
+            Integer cleanlinessScore, Integer userRating, String tags, String description,
             Instant reportedAt) {}
 
     public static HotspotDto of(Hotspot h) {
@@ -99,19 +102,31 @@ public final class Dtos {
                 r.getCostPoints(), r.getStock());
     }
 
-    private static final String ANONYMOUS = "Anonymous Leuvenaar";
-
     /** 4 decimals is about 11 m north-south and 7 m east-west in Leuven. */
     static Double coarse(Double degrees) {
         return degrees == null ? null : Math.round(degrees * 10_000) / 10_000.0;
     }
 
-    public static TrashPhotoDto of(TrashPhoto p) {
-        return new TrashPhotoDto(
-                p.getId(), p.getUsername() != null ? p.getUsername() : ANONYMOUS,
-                p.getFacultyShortCode(), p.getFacultyEmoji(), p.getFacultyColor(),
-                p.getPhotoUrl(), coarse(p.getLat()), coarse(p.getLng()), p.getSegmentName(),
-                p.getCleanlinessScore(), p.getUserRating(), p.getTags(),
-                p.getReportedAt());
+    public static FeedItemDto feedItem(Report r) {
+        Faculty f = r.getCreditedFaculty();
+        StreetSegment street = r.getHotspot() == null ? null : r.getHotspot().getStreetSegment();
+        return new FeedItemDto(
+                r.getId(), reporterLabel(r.getSource()),
+                f != null ? f.getShortCode() : null,
+                f != null ? f.getEmoji() : null,
+                f != null ? f.getColor() : null,
+                r.getPhotoUrl(), coarse(r.getLat()), coarse(r.getLng()),
+                street != null ? street.getName() : null,
+                r.getCleanlinessScore(), CleanlinessScale.toRating(r.getCleanlinessScore()),
+                r.getSignalTags(), r.getAiDescription(), r.getReportedAt());
+    }
+
+    /** Reporters stay anonymous; the feed only says which channel a report came through. */
+    private static String reporterLabel(Report.Source source) {
+        return switch (source) {
+            case WHATSAPP -> "WhatsApp reporter";
+            case WEB -> "Web reporter";
+            case DEMO -> "Leuven Go demo";
+        };
     }
 }

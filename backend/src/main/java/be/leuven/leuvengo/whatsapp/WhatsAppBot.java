@@ -2,19 +2,18 @@ package be.leuven.leuvengo.whatsapp;
 
 import be.leuven.leuvengo.domain.CleanlinessScale;
 import be.leuven.leuvengo.domain.Faculty;
-import be.leuven.leuvengo.domain.TrashPhoto;
+import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.net.SafeHttpFetcher;
-import be.leuven.leuvengo.photo.ImageNormalizer;
-import be.leuven.leuvengo.photo.PhotoStorage;
-import be.leuven.leuvengo.repository.TrashPhotoRepository;
 import be.leuven.leuvengo.security.Pseudonyms;
 import be.leuven.leuvengo.service.GeminiService;
-import be.leuven.leuvengo.service.ReportService;
+import be.leuven.leuvengo.service.LeuvenArea;
+import be.leuven.leuvengo.service.ReportIngestionService;
+import be.leuven.leuvengo.service.ReportIngestionService.Filed;
+import be.leuven.leuvengo.service.ReportIngestionService.Rejected;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.time.Clock;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,7 +23,7 @@ import java.util.stream.Collectors;
  * The WhatsApp conversation, independent of Twilio's HTTP details:
  * <ol>
  *   <li>the user shares a location pin, and we remember it for 30 minutes;</li>
- *   <li>the user sends a photo, and we score it, file the report and reply with the verdict.</li>
+ *   <li>the user sends a photo, which goes through {@link ReportIngestionService}, and we reply with the verdict.</li>
  * </ol>
  * Sending {@code clan CODE} links the sender to a faculty, which then earns points for their reports.
  * Phone numbers are only used to derive pseudonyms; they are never stored or logged.
@@ -48,37 +47,29 @@ public class WhatsAppBot {
 
     static final String WELCOME = "Hi! Send a 📍 location pin to start a cleanliness report.\n\n"
             + "Reply \"clan\" to pick the faculty your reports earn points for.";
-    private static final Pattern CLAN_COMMAND = Pattern.compile("(?i)\\s*clan\\b\\s*(\\S*)\\s*");
     static final String NEED_LOCATION = "We don't have a location yet. Please share a 📍 location pin first, "
             + "then send the photo again.";
     static final String ASK_FOR_PHOTO = "Got it! 📍 Now please send a photo of the litter "
             + "so our AI can assess it.";
+    static final String OUTSIDE_LEUVEN = "That location is outside Leuven. Leuven Go only covers the city of "
+            + "Leuven, so please share a 📍 pin from there.";
     static final String BAD_MEDIA = "We couldn't open that photo. Please send it again as a normal photo.";
+    static final String SERVER_ERROR = "Something went wrong on our side. Please send the photo again in a moment.";
+    private static final Pattern CLAN_COMMAND = Pattern.compile("(?i)\\s*clan\\b\\s*(\\S*)\\s*");
 
     private final WhatsAppSessions sessions;
     private final Pseudonyms pseudonyms;
     private final TwilioMediaFetcher media;
-    private final GeminiService gemini;
-    private final ImageNormalizer images;
-    private final PhotoStorage storage;
-    private final ReportService reports;
-    private final TrashPhotoRepository photos;
+    private final ReportIngestionService ingestion;
     private final ClanMembership clans;
-    private final Clock clock;
 
     public WhatsAppBot(WhatsAppSessions sessions, Pseudonyms pseudonyms, TwilioMediaFetcher media,
-                       ImageNormalizer images, GeminiService gemini, PhotoStorage storage, ReportService reports,
-                       TrashPhotoRepository photos, ClanMembership clans, Clock clock) {
+                       ReportIngestionService ingestion, ClanMembership clans) {
         this.sessions = sessions;
         this.pseudonyms = pseudonyms;
         this.media = media;
-        this.gemini = gemini;
-        this.images = images;
-        this.storage = storage;
-        this.reports = reports;
-        this.photos = photos;
+        this.ingestion = ingestion;
         this.clans = clans;
-        this.clock = clock;
     }
 
     /** Handles one message and returns the text to reply with. */
@@ -91,6 +82,9 @@ public class WhatsAppBot {
 
         if (message.hasLocation()) {
             log.info("WhatsApp location from {}", publicId);
+            if (!LeuvenArea.contains(message.lat(), message.lng())) {
+                return OUTSIDE_LEUVEN;
+            }
             sessions.start(senderKey, message.lat(), message.lng());
             return ASK_FOR_PHOTO;
         }
@@ -105,6 +99,43 @@ public class WhatsAppBot {
             }
         }
         return WELCOME;
+    }
+
+    private String handlePhoto(String senderKey, String publicId, String mediaUrl) {
+        Optional<WhatsAppSessions.Location> location = sessions.current(senderKey);
+        if (location.isEmpty()) {
+            return NEED_LOCATION;
+        }
+
+        byte[] image;
+        try {
+            image = media.fetch(mediaUrl).bytes();
+        } catch (SafeHttpFetcher.FetchException e) {
+            log.warn("Refused WhatsApp media from {}: {}", publicId, e.getMessage());
+            return BAD_MEDIA;
+        }
+
+        String clan = clans.clanOf(senderKey).map(Faculty::getShortCode).orElse(null);
+        ReportIngestionService.Outcome outcome;
+        try {
+            outcome = ingestion.ingest(new ReportIngestionService.PhotoReport(
+                    location.get().lat(), location.get().lng(), image, Report.Source.WHATSAPP, publicId, clan));
+        } catch (RuntimeException e) {
+            log.error("Could not file WhatsApp report from {}", publicId, e);
+            return SERVER_ERROR;
+        }
+
+        return switch (outcome) {
+            case Filed filed -> {
+                sessions.finish(senderKey);
+                yield verdict(filed.verdict());
+            }
+            case Rejected rejected -> switch (rejected.reason()) {
+                case UNREADABLE_IMAGE -> BAD_MEDIA;
+                case NOT_GENUINE -> rejection(rejected.detail());
+                case OUTSIDE_LEUVEN -> OUTSIDE_LEUVEN;
+            };
+        };
     }
 
     private String handleClan(String senderKey, String code) {
@@ -122,56 +153,6 @@ public class WhatsAppBot {
                 .collect(Collectors.joining("\n"));
         return (code.isEmpty() ? "" : "There's no clan called \"" + code + "\".\n\n")
                 + current + "Reply \"clan CODE\" to join one of:\n" + options;
-    }
-
-    private String handlePhoto(String senderKey, String publicId, String mediaUrl) {
-        Optional<WhatsAppSessions.Location> location = sessions.current(senderKey);
-        if (location.isEmpty()) {
-            return NEED_LOCATION;
-        }
-
-        ImageNormalizer.Normalized photo;
-        try {
-            photo = images.normalize(media.fetch(mediaUrl).bytes());
-        } catch (SafeHttpFetcher.FetchException | ImageNormalizer.UnreadableImageException e) {
-            log.warn("Refused WhatsApp media from {}: {}", publicId, e.getMessage());
-            return BAD_MEDIA;
-        }
-
-        GeminiService.ScoreResult ai = gemini.scorePhoto(photo.bytes(), photo.contentType());
-        if (ai.fake()) {
-            log.info("Rejected a photo from {} as not genuine: {}", publicId, ai.fakeReason());
-            return rejection(ai.fakeReason());
-        }
-
-        String photoUrl = storage.store(photo, publicId);
-        file(location.get(), ai, photoUrl, publicId, clans.clanOf(senderKey).orElse(null));
-        sessions.finish(senderKey);
-        return verdict(ai);
-    }
-
-    private void file(WhatsAppSessions.Location at, GeminiService.ScoreResult ai, String photoUrl,
-                      String publicId, Faculty clan) {
-        String tags = ai.tags().isEmpty() ? null : String.join(",", ai.tags());
-        reports.submit(new ReportService.Submission(
-                at.lat(), at.lng(), ai.score(), "WhatsApp report", photoUrl, tags,
-                clan == null ? null : clan.getShortCode(), publicId));
-
-        TrashPhoto feedItem = new TrashPhoto();
-        feedItem.setUsername("WhatsApp user");
-        feedItem.setPhotoUrl(photoUrl);
-        feedItem.setLat(at.lat());
-        feedItem.setLng(at.lng());
-        feedItem.setCleanlinessScore(ai.score());
-        feedItem.setUserRating(CleanlinessScale.toRating(ai.score()));
-        feedItem.setTags(tags);
-        if (clan != null) {
-            feedItem.setFacultyShortCode(clan.getShortCode());
-            feedItem.setFacultyEmoji(clan.getEmoji());
-            feedItem.setFacultyColor(clan.getColor());
-        }
-        feedItem.setReportedAt(clock.instant());
-        photos.save(feedItem);
     }
 
     private static String rejection(String reason) {

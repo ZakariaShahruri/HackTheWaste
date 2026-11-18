@@ -13,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Runs reports through the real pipeline (clustering, escalation, scoring,
@@ -76,7 +77,15 @@ class ReportPipelineIT {
 
     private Report submit(int score) {
         return reportService.submit(new ReportService.Submission(
-                LAT, LNG, score, "test", null, null, "FAR", "test-reporter"));
+                LAT, LNG, score, Report.Source.WEB, "test-reporter", "FAR", ReportService.Evidence.NONE));
+    }
+
+    @Test
+    void reportsOutsideLeuvenAreRefused() {
+        assertThatThrownBy(() -> reportService.submit(new ReportService.Submission(
+                51.2194, 4.4025, 50, Report.Source.WEB, "antwerp", null, ReportService.Evidence.NONE)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("outside Leuven");
     }
 
     private StreetSegment gasthuisberg() {

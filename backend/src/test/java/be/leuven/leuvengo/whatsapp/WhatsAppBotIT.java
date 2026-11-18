@@ -5,8 +5,6 @@ import be.leuven.leuvengo.net.SafeHttpFetcher;
 import be.leuven.leuvengo.repository.FacultyRepository;
 import be.leuven.leuvengo.repository.PendingReportRepository;
 import be.leuven.leuvengo.repository.ReportRepository;
-import be.leuven.leuvengo.repository.TrashPhotoRepository;
-import be.leuven.leuvengo.domain.TrashPhoto;
 import be.leuven.leuvengo.support.TestImages;
 import be.leuven.leuvengo.security.Pseudonyms;
 import be.leuven.leuvengo.service.GeminiService;
@@ -41,7 +39,6 @@ class WhatsAppBotIT {
     @Autowired ReportRepository reports;
     @Autowired Pseudonyms pseudonyms;
     @Autowired FacultyRepository faculties;
-    @Autowired TrashPhotoRepository feed;
     @MockitoBean GeminiService gemini;
     @MockitoBean TwilioMediaFetcher media;
 
@@ -73,9 +70,10 @@ class WhatsAppBotIT {
         location(ANA);
         photo(ANA);
 
-        TrashPhoto feedItem = feed.findAll().stream().max(Comparator.comparing(TrashPhoto::getId)).orElseThrow();
-        assertThat(feedItem.getPhotoUrl()).startsWith("/api/photos/");
-        assertThat(feedItem.getCleanlinessScore()).isEqualTo(10);
+        Report latest = latestReport();
+        assertThat(latest.getPhotoUrl()).startsWith("/api/photos/");
+        assertThat(latest.getSource()).isEqualTo(Report.Source.WHATSAPP);
+        assertThat(latest.getAiDescription()).isEqualTo("Overflowing bin");
     }
 
     @Test
@@ -125,6 +123,13 @@ class WhatsAppBotIT {
     }
 
     @Test
+    void aPinOutsideLeuvenIsRefusedStraightAway() {
+        assertThat(bot.handle(new WhatsAppBot.Inbound(ANA, null, 51.2194, 4.4025, null)))
+                .isEqualTo(WhatsAppBot.OUTSIDE_LEUVEN);
+        assertThat(pending.count()).isZero();
+    }
+
+    @Test
     void aNewPinReplacesTheOldOne() {
         location(ANA);
         bot.handle(new WhatsAppBot.Inbound(ANA, null, 50.88, 4.70, null));
@@ -171,7 +176,7 @@ class WhatsAppBotIT {
         photo(ANA);
 
         Report latest = latestReport();
-        assertThat(latest.getCrediteFaculty().getShortCode()).isEqualTo("EKO");
+        assertThat(latest.getCreditedFaculty().getShortCode()).isEqualTo("EKO");
         assertThat(faculties.findByShortCode("EKO").orElseThrow().getPoints())
                 .isEqualTo(before + PointsPolicy.pointsFor(10));
     }
@@ -180,7 +185,7 @@ class WhatsAppBotIT {
     void reportsWithoutAClanCreditNobody() {
         location(BOB);
         photo(BOB);
-        assertThat(latestReport().getCrediteFaculty()).isNull();
+        assertThat(latestReport().getCreditedFaculty()).isNull();
     }
 
     @Test

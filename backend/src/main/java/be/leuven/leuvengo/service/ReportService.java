@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -36,23 +37,38 @@ public class ReportService {
         this.props = props;
     }
 
-    /** A report entering the pipeline; {@code cleanlinessScore} is 0-100 (100 = clean). */
-    public record Submission(Double lat, Double lng, Integer cleanlinessScore,
-                             String note, String imageRef,
-                             String signalTags, String facultyShortCode,
-                             String reporterPseudoId) {}
+    /**
+     * A report entering the pipeline. {@code cleanlinessScore} is 0-100 (100 = clean);
+     * {@code facultyShortCode} is the clan to credit, if any.
+     */
+    public record Submission(double lat, double lng, int cleanlinessScore, Report.Source source,
+                             String reporterPseudoId, String facultyShortCode, Evidence evidence) {}
+
+    /** What backs a report up. Everything is optional. */
+    public record Evidence(String photoUrl, List<String> tags, String description, String note) {
+
+        public static final Evidence NONE = new Evidence(null, List.of(), null, null);
+
+        public static Evidence tags(List<String> tags) {
+            return new Evidence(null, tags, null, null);
+        }
+    }
 
     @Transactional
     public Report submit(Submission s) {
         validate(s);
 
+        Evidence evidence = s.evidence() == null ? Evidence.NONE : s.evidence();
         Report r = new Report();
         r.setLat(s.lat());
         r.setLng(s.lng());
         r.setCleanlinessScore(s.cleanlinessScore());
-        r.setNote(safe(s.note(), 500));
-        r.setImageRef(s.imageRef());
-        r.setSignalTags(safe(s.signalTags(), 200));
+        r.setSource(s.source());
+        r.setPhotoUrl(evidence.photoUrl());
+        r.setAiDescription(truncate(evidence.description(), 200));
+        r.setNote(truncate(evidence.note(), 500));
+        r.setSignalTags(evidence.tags() == null || evidence.tags().isEmpty()
+                ? null : truncate(String.join(",", evidence.tags()), 200));
         r.setReportedAt(Instant.now());
         r.setReporterPseudoId(s.reporterPseudoId() != null ? s.reporterPseudoId()
                 : "anon-" + UUID.randomUUID().toString().substring(0, 8));
@@ -60,7 +76,7 @@ public class ReportService {
         if (s.facultyShortCode() != null) {
             faculties.findByShortCode(s.facultyShortCode())
                     .ifPresent(f -> {
-                        r.setCrediteFaculty(f);
+                        r.setCreditedFaculty(f);
                         int award = PointsPolicy.pointsFor(s.cleanlinessScore());
                         f.setPoints((f.getPoints() == null ? 0 : f.getPoints()) + award);
                     });
@@ -83,17 +99,18 @@ public class ReportService {
     }
 
     private void validate(Submission s) {
-        if (s.lat() == null || s.lng() == null) {
-            throw new IllegalArgumentException("Coordinates required");
+        if (!LeuvenArea.contains(s.lat(), s.lng())) {
+            throw new IllegalArgumentException("Location is outside Leuven");
         }
-        if (s.cleanlinessScore() == null
-                || s.cleanlinessScore() < CleanlinessScale.MIN_SCORE
-                || s.cleanlinessScore() > CleanlinessScale.MAX_SCORE) {
+        if (s.cleanlinessScore() < CleanlinessScale.MIN_SCORE || s.cleanlinessScore() > CleanlinessScale.MAX_SCORE) {
             throw new IllegalArgumentException("Cleanliness score must be 0-100");
+        }
+        if (s.source() == null) {
+            throw new IllegalArgumentException("Source required");
         }
     }
 
-    private String safe(String v, int max) {
+    private static String truncate(String v, int max) {
         if (v == null) return null;
         return v.length() <= max ? v : v.substring(0, max);
     }

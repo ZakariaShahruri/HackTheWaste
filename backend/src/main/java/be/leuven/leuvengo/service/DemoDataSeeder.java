@@ -225,10 +225,9 @@ public class DemoDataSeeder {
             double dLng = rnd.nextGaussian() * 0.0008;
             int rating = Math.max(1, Math.min(5, baseRating + (rnd.nextInt(3) - 1)));
             reportService.submit(new ReportService.Submission(
-                    lat + dLat, lng + dLng, CleanlinessScale.fromRating(rating),
-                    "Predictive Analysis: High probability zone (" + tags + ")",
-                    null, tags,
-                    facCode, "ai-seed-" + facCode + "-" + i + "-" + rnd.nextInt(1000)));
+                    lat + dLat, lng + dLng, CleanlinessScale.fromRating(rating), Report.Source.DEMO,
+                    "demo-" + facCode + "-" + i, facCode,
+                    ReportService.Evidence.tags(List.of(tags.split(",")))));
         }
     }
 
