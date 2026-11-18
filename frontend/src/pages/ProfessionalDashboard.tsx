@@ -34,7 +34,8 @@ export default function ProfessionalDashboard() {
         <div>
           <h1 className="page-title">Operations Overview</h1>
           <div className="muted page-subtitle">
-            Live cleanliness signals across Leuven · last refresh {new Date().toLocaleTimeString()}
+            Live cleanliness signals across Leuven
+            {stats.lastUpdated && ` · updated ${stats.lastUpdated.toLocaleTimeString("nl-BE")}`}
           </div>
         </div>
         <Link to="/pro/operations" className="btn btn-ghost btn-sm">
@@ -43,8 +44,8 @@ export default function ProfessionalDashboard() {
       </div>
 
       <section className="kpi-grid">
-        <Kpi label="Total reports (72h)" value={stats.data?.totalReports ?? "—"} sub="anonymized signals" />
-        <Kpi label="Active hotspots" value={stats.data?.openHotspots ?? "—"} sub="post-clustering" />
+        <Kpi label="Reports filed" value={stats.data?.totalReports ?? "—"} sub="every report so far" />
+        <Kpi label="Open hotspots" value={stats.data?.openHotspots ?? "—"} sub="waiting for a crew" />
         <Kpi
           label="Planon orders dispatched"
           value={stats.data?.dispatchedOrders ?? "—"}

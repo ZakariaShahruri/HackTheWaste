@@ -4,6 +4,7 @@ import { useAuth } from "../context/auth";
 import { errorMessage, isApiError } from "../api/http";
 import { useApi } from "../hooks/useApi";
 import { api } from "../api/client";
+import { ClanPills } from "../components/ClanPills";
 
 export default function SignupPage() {
   const { register, loading } = useAuth();
@@ -65,7 +66,7 @@ export default function SignupPage() {
               required
               minLength={8}
               maxLength={72}
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters"
             />
           </div>
 
@@ -83,30 +84,10 @@ export default function SignupPage() {
           </div>
 
           <div>
-            <label style={{ display: "block", marginBottom: 8 }}>
-              Clan{" "}
-              <span className="muted" style={{ fontWeight: 400 }}>
-                (optional — you can change this later)
-              </span>
-            </label>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {(faculties ?? []).map((f) => (
-                <button
-                  key={f.id}
-                  type="button"
-                  onClick={() => setClan((c) => (c === f.shortCode ? undefined : f.shortCode))}
-                  className="btn btn-sm"
-                  style={{
-                    background: clan === f.shortCode ? f.color : "white",
-                    color: clan === f.shortCode ? "white" : "#1f2937",
-                    border: `1px solid ${f.color}`,
-                    fontWeight: 600,
-                  }}
-                >
-                  {f.emoji} {f.shortCode}
-                </button>
-              ))}
+            <div className="field-label">
+              Clan <span className="muted">(optional, the faculty your reports score for)</span>
             </div>
+            <ClanPills label="Clan" faculties={faculties ?? []} selected={clan} onSelect={setClan} />
             {clan && (
               <p style={{ marginTop: 8, fontSize: 13, color: "var(--fg-soft)" }}>
                 Selected: <strong>{faculties?.find((f) => f.shortCode === clan)?.name}</strong>

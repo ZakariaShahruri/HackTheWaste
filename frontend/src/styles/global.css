@@ -2017,3 +2017,45 @@ textarea {
     bottom: 72px;
   }
 }
+
+/* clan pickers on the feed and sign-up */
+.clan-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+
+.clan-pill {
+  background: var(--bg-elev);
+  color: var(--fg);
+  border: 1px solid var(--clan, var(--border));
+}
+
+.clan-pill.active {
+  background: var(--clan, var(--fg));
+  color: white;
+}
+
+.clan-pill-none.active {
+  background: var(--fg);
+}
+
+.form-grid .clan-pills {
+  margin-bottom: 0;
+}
+
+.field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fg-soft);
+  margin-bottom: 8px;
+}
+
+.field-label .muted {
+  font-weight: 400;
+}
+
+.feed-page {
+  max-width: 1100px;
+}

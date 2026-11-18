@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { errorMessage } from "../api/http";
 import { useApi } from "../hooks/useApi";
+import { ClanPills } from "../components/ClanPills";
 import { PhotoCard } from "../components/PhotoCard";
 import { EmptyState, ErrorState, Skeleton } from "../components/States";
 import type { FeedItemDto } from "../api/types";
@@ -14,7 +15,7 @@ export default function FeedPage() {
   const [total, setTotal] = useState<number | null>(null);
 
   return (
-    <div className="container" style={{ maxWidth: 1100 }}>
+    <div className="container feed-page">
       <div className="page-header">
         <div>
           <h1 className="page-title">Leuven Feed</h1>
@@ -24,35 +25,13 @@ export default function FeedPage() {
         </div>
       </div>
 
-      {/* Clan filter */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 20 }}>
-        <button
-          className="btn btn-sm"
-          style={{
-            background: !clan ? "var(--fg)" : "white",
-            color: !clan ? "white" : "var(--fg)",
-            border: "1px solid var(--border)",
-          }}
-          onClick={() => setClan(undefined)}
-        >
-          All clans
-        </button>
-        {(faculties.data ?? []).map((f) => (
-          <button
-            key={f.id}
-            className="btn btn-sm"
-            style={{
-              background: clan === f.shortCode ? f.color : "white",
-              color: clan === f.shortCode ? "white" : "#1f2937",
-              border: `1px solid ${f.color}`,
-              fontWeight: 600,
-            }}
-            onClick={() => setClan((c) => (c === f.shortCode ? undefined : f.shortCode))}
-          >
-            {f.emoji} {f.shortCode}
-          </button>
-        ))}
-      </div>
+      <ClanPills
+        label="Filter by clan"
+        faculties={faculties.data ?? []}
+        selected={clan}
+        onSelect={setClan}
+        noneLabel="All clans"
+      />
 
       {/* Remounting per clan resets paging state without effects juggling it. */}
       <FeedResults key={clan ?? "all"} clan={clan} onTotal={setTotal} />
