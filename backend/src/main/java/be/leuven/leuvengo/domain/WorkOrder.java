@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 @Entity
-@Table(name = "work_order")
+@Table(name = "work_order", indexes = @Index(name = "idx_work_order_hotspot", columnList = "hotspot_id"))
 public class WorkOrder {
 
     public enum Status { PENDING, DISPATCHED, IN_PROGRESS, COMPLETED, FAILED }

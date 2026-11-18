@@ -1,8 +1,6 @@
 package be.leuven.leuvengo.domain;
 
 import jakarta.persistence.*;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "faculty")
@@ -22,8 +20,8 @@ public class Faculty {
     private Integer members;
     private Integer points;
 
-    @JdbcTypeCode(SqlTypes.LONG32VARCHAR)
-    @Column(name = "territory_geojson")
+    /** A GeoJSON Polygon; plain varchar so H2 and Postgres map it the same way. */
+    @Column(name = "territory_geojson", length = 10_000)
     private String territoryGeoJson;
 
     public Long getId() { return id; }

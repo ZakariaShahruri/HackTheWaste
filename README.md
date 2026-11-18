@@ -97,13 +97,13 @@ flowchart LR
 
 ## Stack
 
-| Part        | Tech                                                                 |
-| ----------- | -------------------------------------------------------------------- |
-| `backend/`  | Java 21, Spring Boot 4.1, Hibernate 7; H2 in dev, Postgres in prod   |
-| `frontend/` | React 19, TypeScript, Vite 8, react-router, React-Leaflet, OSM tiles |
-| `ml/`       | Python 3.13, FastAPI, scikit-learn                                   |
-| AI          | Google Gemini (`gemini-2.5-flash-lite` by default)                   |
-| Messaging   | Twilio WhatsApp                                                      |
+| Part        | Tech                                                                       |
+| ----------- | -------------------------------------------------------------------------- |
+| `backend/`  | Java 21, Spring Boot 4.1, Hibernate 7, Flyway; H2 in dev, Postgres in prod |
+| `frontend/` | React 19, TypeScript, Vite 8, react-router, React-Leaflet, OSM tiles       |
+| `ml/`       | Python 3.13, FastAPI, scikit-learn                                         |
+| AI          | Google Gemini (`gemini-2.5-flash-lite` by default)                         |
+| Messaging   | Twilio WhatsApp                                                            |
 
 ## Running it locally
 
@@ -182,7 +182,10 @@ cd frontend && npm run lint && npm run typecheck && npm test && npm run build
 cd ml       && pip install -r requirements-dev.txt && pytest
 ```
 
-GitHub Actions runs all three on every push.
+The backend suite includes a test that boots the app on a real Postgres in
+Docker (Testcontainers), so the Flyway migrations and entity mappings are
+checked against the production database. It is skipped when Docker isn't
+running. GitHub Actions runs all three suites on every push.
 
 ## Limitations
 
