@@ -3,6 +3,9 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { useAuth } from "../context/auth";
 import { errorMessage, isApiError } from "../api/http";
 
+/** Public demo account seeded by the backend (leuvengo.demo.*). */
+const DEMO_CREW = { email: "crew@leuvengo.demo", password: "cleanleuven" };
+
 export default function LoginPage() {
   const { login, loading } = useAuth();
   const navigate = useNavigate();
@@ -11,6 +14,11 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  function fillDemoCrew() {
+    setEmail(DEMO_CREW.email);
+    setPassword(DEMO_CREW.password);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -81,6 +89,14 @@ export default function LoginPage() {
             {loading ? "Logging in…" : "Log in"}
           </button>
         </form>
+
+        <div className="demo-login-hint">
+          <strong>Trying the demo?</strong> Log in as a city crew with{" "}
+          <code>{DEMO_CREW.email}</code> / <code>{DEMO_CREW.password}</code>{" "}
+          <button type="button" className="link-btn" onClick={fillDemoCrew}>
+            Fill in
+          </button>
+        </div>
 
         <p style={{ marginTop: 20, textAlign: "center", fontSize: 14, color: "var(--fg-soft)" }}>
           No account yet?{" "}

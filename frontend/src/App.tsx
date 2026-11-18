@@ -36,7 +36,7 @@ path.startsWith("/market") ||
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/pro" element={<ProfessionalDashboard />} />
-            <Route path="/pro/operations" element={<ProtectedRoute><OperationsPage /></ProtectedRoute>} />
+            <Route path="/pro/operations" element={<ProtectedRoute role="CREW"><OperationsPage /></ProtectedRoute>} />
             <Route path="/student" element={<StudentDashboard />} />
             <Route path="/student/leaderboard" element={<LeaderboardPage />} />
             <Route path="/market" element={<MarketplacePage />} />

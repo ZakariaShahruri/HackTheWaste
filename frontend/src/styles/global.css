@@ -1133,3 +1133,25 @@ textarea {
   width: 220px;
   padding: 16px;
 }
+
+.demo-login-hint {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--bg-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.demo-login-hint code {
+  font-size: 12px;
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+}

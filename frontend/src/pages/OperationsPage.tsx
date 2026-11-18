@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api } from "../api/client";
+import { errorMessage } from "../api/http";
 import { useApi } from "../hooks/useApi";
 import { StatusTag } from "../components/StatusTag";
 import { HotspotMap } from "../components/Map/HotspotMap";
@@ -8,13 +9,17 @@ export default function OperationsPage() {
   const orders = useApi((signal) => api.workOrders(signal));
   const hotspots = useApi((signal) => api.activeHotspots(signal));
   const [busyId, setBusyId] = useState<number | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const complete = async (id: number) => {
     setBusyId(id);
+    setActionError(null);
     try {
       await api.completeWorkOrder(id);
       orders.refetch();
       hotspots.refetch();
+    } catch (e) {
+      setActionError(errorMessage(e, "Could not complete the work order"));
     } finally {
       setBusyId(null);
     }
@@ -26,7 +31,7 @@ export default function OperationsPage() {
         <div>
           <h1 style={{ fontSize: 28 }}>Crew operations queue</h1>
           <div className="muted" style={{ marginTop: 4 }}>
-            Dispatched via Planon · routed by district + severity
+            Dispatched via Planon · routed by district and cleanliness
           </div>
         </div>
       </div>
@@ -52,6 +57,11 @@ export default function OperationsPage() {
 
         <div className="card">
           <div className="card-title">Work order queue</div>
+          {actionError && (
+            <div role="alert" className="tag tag-danger" style={{ marginTop: 10 }}>
+              {actionError}
+            </div>
+          )}
           <div className="stack" style={{ marginTop: 12 }}>
             {(orders.data ?? []).map((w) => (
               <div

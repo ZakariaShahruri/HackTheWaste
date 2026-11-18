@@ -116,10 +116,14 @@ export interface FeedPage {
   last: boolean;
 }
 
+export type Role = "USER" | "CREW";
+
 export interface AuthUser {
   id: number;
   email: string;
   facultyShortCode?: string;
+  role: Role;
+  /** Only returned by login/register; kept client-side afterwards. */
   token: string;
 }
 
