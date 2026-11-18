@@ -1,17 +1,3 @@
-export interface ReportDto {
-  id: number;
-  lat: number;
-  lng: number;
-  rating: number;
-  note?: string;
-  imageRef?: string;
-  signalTags?: string;
-  faculty?: string;
-  facultyColor?: string;
-  hotspotId?: number;
-  reportedAt: string;
-}
-
 export interface HotspotDto {
   id: number;
   lat: number;
@@ -145,15 +131,4 @@ export interface PredictPoint {
   lat: number;
   lng: number;
   likelihood: number;
-}
-
-export interface CreateReportPayload {
-  lat: number;
-  lng: number;
-  rating: number;
-  note?: string;
-  imageRef?: string;
-  signalTags?: string;
-  facultyShortCode?: string;
-  reporterPseudoId?: string;
 }

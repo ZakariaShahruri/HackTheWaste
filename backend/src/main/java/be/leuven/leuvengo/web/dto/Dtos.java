@@ -11,11 +11,6 @@ public final class Dtos {
 
     private Dtos() {}
 
-    public record ReportDto(Long id, Double lat, Double lng, Integer rating,
-                            String note, String imageRef, String signalTags,
-                            String faculty, String facultyColor,
-                            Long hotspotId, Instant reportedAt) {}
-
     public record HotspotDto(Long id, Double lat, Double lng, Double severity,
                              Integer reportCount, String status, String label,
                              String segmentName, Instant createdAt, Instant lastUpdatedAt) {}
@@ -57,16 +52,6 @@ public final class Dtos {
             String photoUrl, Double lat, Double lng, String segmentName,
             Integer cleanlinessScore, Integer userRating, String tags,
             Instant reportedAt) {}
-
-    public static ReportDto of(Report r) {
-        return new ReportDto(
-                r.getId(), r.getLat(), r.getLng(), r.getCleanlinessRating(),
-                r.getNote(), r.getImageRef(), r.getSignalTags(),
-                r.getCrediteFaculty() != null ? r.getCrediteFaculty().getName() : null,
-                r.getCrediteFaculty() != null ? r.getCrediteFaculty().getColor() : null,
-                r.getHotspot() != null ? r.getHotspot().getId() : null,
-                r.getReportedAt());
-    }
 
     public static HotspotDto of(Hotspot h) {
         return new HotspotDto(

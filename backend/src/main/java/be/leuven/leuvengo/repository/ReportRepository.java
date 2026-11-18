@@ -11,6 +11,4 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
 
     @Query("select r from Report r where r.reportedAt >= :since")
     List<Report> findRecent(Instant since);
-
-    List<Report> findTop50ByOrderByReportedAtDesc();
 }

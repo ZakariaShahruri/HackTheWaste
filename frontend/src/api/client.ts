@@ -1,13 +1,11 @@
 import type {
   AuthUser,
   CityConfig,
-  CreateReportPayload,
   FacultyDto,
   FeedPage,
   HotspotDto,
   LeaderboardEntry,
   PredictPoint,
-  ReportDto,
   RewardItemDto,
   StatsDto,
   StreetSegmentDto,
@@ -61,9 +59,6 @@ export const api = {
 
   city: () => request<CityConfig>("/stats/city"),
   stats: () => request<StatsDto>("/stats"),
-  reports: () => request<ReportDto[]>("/reports/recent"),
-  submitReport: (p: CreateReportPayload) =>
-    request<ReportDto>("/reports", { method: "POST", json: p }),
   hotspots: () => request<HotspotDto[]>("/hotspots"),
   activeHotspots: () => request<HotspotDto[]>("/hotspots/active"),
   segments: () => request<StreetSegmentDto[]>("/segments"),
