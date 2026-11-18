@@ -1,11 +1,11 @@
 package be.leuven.leuvengo.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import be.leuven.leuvengo.config.LeuvenGoProperties;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -28,15 +28,20 @@ public class PredictionService {
     private static final DateTimeFormatter ISO = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
 
     private final String mlApiUrl;
-
-    public PredictionService(LeuvenGoProperties props) {
-        this.mlApiUrl = props.ml().apiUrl();
-    }
-
+    private final JsonMapper mapper;
+    /**
+     * HTTP/1.1 on purpose: over plain http the JDK client otherwise tries an
+     * h2c upgrade, which uvicorn rejects, dropping the request body (422).
+     */
     private final HttpClient http = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
             .connectTimeout(Duration.ofSeconds(2))
             .build();
-    private final ObjectMapper mapper = new ObjectMapper();
+
+    public PredictionService(LeuvenGoProperties props, JsonMapper mapper) {
+        this.mlApiUrl = props.ml().apiUrl();
+        this.mapper = mapper;
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record PredictPoint(double lat, double lng, double likelihood) {}
@@ -74,7 +79,7 @@ public class PredictionService {
             GridResponse grid = mapper.readValue(resp.body(), GridResponse.class);
             return grid.points();
         } catch (Exception e) {
-            log.warn("ML API unavailable — predictive heatmap skipped: {}", e.getMessage());
+            log.warn("ML API unavailable, predictive heatmap skipped: {}", e.getMessage());
             return List.of();
         }
     }
