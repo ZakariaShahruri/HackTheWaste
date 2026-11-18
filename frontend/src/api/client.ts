@@ -1,6 +1,8 @@
 import { request } from "./http";
 import type {
   AuthUser,
+  DemoReportForm,
+  DemoReportResult,
   FacultyDto,
   FeedPage,
   HotspotDto,
@@ -43,6 +45,15 @@ export const api = {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
     if (clan) params.set("clan", clan);
     return request<FeedPage>(`/feed?${params}`, { signal });
+  },
+
+  submitDemoReport: ({ photo, lat, lng, clan }: DemoReportForm) => {
+    const form = new FormData();
+    form.set("photo", photo, "photo.jpg");
+    form.set("lat", String(lat));
+    form.set("lng", String(lng));
+    if (clan) form.set("clan", clan);
+    return request<DemoReportResult>("/demo-reports", { method: "POST", body: form });
   },
 
   /** `day` 0 = Monday; the backend resolves it to the coming date in Leuven time. */

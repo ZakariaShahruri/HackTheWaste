@@ -35,8 +35,11 @@ flowchart LR
 ```
 
 1. **Report.** Over WhatsApp you send a location pin, then a photo. Without
-   WhatsApp, `POST /api/demo-reports` takes the same photo and pin from the
-   browser and runs the exact same pipeline.
+   WhatsApp, the report page's "In your browser" tab takes the same photo and
+   a spot (your location or a tap on the map) and posts them to
+   `POST /api/demo-reports`, which runs the exact same pipeline. The browser
+   turns the photo upright and shrinks it to 1600 px before uploading, and
+   the demo takes 5 uploads per visitor per hour.
 2. **Check.** The photo is re-encoded to a JPEG of at most 1280 px, which also
    drops EXIF data such as GPS. Gemini scores it from 0 (filthy) to 100 (clean)
    and rejects screenshots and stock photos. Pins outside Leuven are refused.

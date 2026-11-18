@@ -23,7 +23,12 @@ export default function LandingPage() {
           <br />A cleaner Leuven.
         </h1>
         <p>Cleanliness signals from the street, dispatched to the right Planon crew.</p>
-        <WhatsAppReportCTA variant="inline" className="landing-hero-cta" />
+        <div className="landing-hero-cta">
+          <WhatsAppReportCTA variant="inline" />
+          <Link to="/report?via=browser" className="btn btn-ghost">
+            🌐 Try it in your browser
+          </Link>
+        </div>
       </section>
 
       <section className="landing-stats card">

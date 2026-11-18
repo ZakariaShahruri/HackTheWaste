@@ -159,3 +159,23 @@ export interface PredictionGrid {
   available: boolean;
   points: PredictPoint[];
 }
+
+/** The AI's verdict on a photo sent from the browser. */
+export interface DemoReportResult {
+  reportId: number;
+  hotspotId: number;
+  photoUrl: string;
+  /** False when the AI was unreachable and `score` is a placeholder. */
+  aiAvailable: boolean;
+  score: number;
+  label: string;
+  description?: string | null;
+  tags: string[];
+}
+
+export interface DemoReportForm {
+  photo: Blob;
+  lat: number;
+  lng: number;
+  clan?: string;
+}

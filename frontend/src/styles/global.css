@@ -1050,6 +1050,10 @@ textarea {
 
 .landing-hero-cta {
   margin-top: 22px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }
 
 .landing-stats {
@@ -1671,4 +1675,198 @@ textarea {
   top: 0;
   left: 0;
   pointer-events: none;
+}
+
+/* report page */
+.report-page {
+  max-width: 760px;
+}
+
+.report-hero {
+  padding: 24px 0 8px;
+}
+
+.report-tabs {
+  display: flex;
+  width: fit-content;
+  margin: 8px auto 20px;
+}
+
+.report-whatsapp {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.report-how {
+  font-size: 20px;
+  margin-bottom: 16px;
+}
+
+.report-how-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.report-how-step {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.report-how-icon {
+  font-size: 24px;
+}
+
+.report-how-title {
+  font-weight: 700;
+}
+
+.report-steps {
+  margin: 0;
+  padding: 0 0 0 22px;
+  display: grid;
+  gap: 24px;
+}
+
+.report-steps > li::marker {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.report-step-title {
+  font-size: 17px;
+  margin-bottom: 10px;
+}
+
+.report-step-title .muted {
+  font-weight: 400;
+  font-size: 14px;
+}
+
+.location-actions {
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.location-note {
+  margin: 0 0 10px;
+  font-size: 14px;
+  color: var(--warning);
+}
+
+.location-picker .map-shell {
+  height: clamp(260px, 45vh, 380px);
+  cursor: crosshair;
+}
+
+.photo-drop {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 140px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-soft);
+  color: var(--fg-soft);
+  font-weight: 600;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.photo-drop:focus-within {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.photo-drop input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.photo-drop.has-photo {
+  border-style: solid;
+  padding: 0;
+}
+
+.photo-drop img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: contain;
+}
+
+.clan-select {
+  width: 100%;
+  max-width: 360px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elev);
+  color: var(--fg);
+  font-size: 14px;
+}
+
+.report-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.report-hint a {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.form-error {
+  margin-top: 20px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 14px;
+}
+
+.report-submit {
+  margin-top: 20px;
+  width: 100%;
+  justify-content: center;
+  padding: 12px 16px;
+}
+
+.verdict {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.verdict-photo {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  display: block;
+}
+
+.verdict-score {
+  margin-top: 8px;
+  font-size: 18px;
+}
+
+.verdict-description {
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+.verdict-points {
+  margin: 12px 0 0;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.verdict-actions {
+  flex-wrap: wrap;
+  margin-top: 16px;
 }

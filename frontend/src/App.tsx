@@ -14,7 +14,8 @@ import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
 
-const HIDE_FLOATING_WHATSAPP = ["/report", "/login", "/signup"];
+// Landing and the report page have their own WhatsApp button; login and signup are forms.
+const HIDE_FLOATING_WHATSAPP = ["/", "/report", "/login", "/signup"];
 
 export default function App() {
   const location = useLocation();

@@ -12,3 +12,10 @@ export const LEUVEN_BOUNDS: LatLngBoundsExpression = [
 
 export const LEUVEN_MIN_ZOOM = 12;
 export const LEUVEN_MAX_ZOOM = 18;
+
+// Where reports are accepted; the same box as the backend's LeuvenArea.
+const REPORT_AREA = { south: 50.83, north: 50.93, west: 4.62, east: 4.79 };
+
+export function isInLeuven(lat: number, lng: number): boolean {
+  return lat >= REPORT_AREA.south && lat <= REPORT_AREA.north && lng >= REPORT_AREA.west && lng <= REPORT_AREA.east;
+}

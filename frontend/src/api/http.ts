@@ -14,11 +14,14 @@ export function assetUrl(url: string): string {
 /** Error thrown for any non-2xx response, carrying the HTTP status. */
 export class ApiError extends Error {
   readonly status: number;
+  /** From a 429's Retry-After header: how long until the limit lifts. */
+  readonly retryAfterSeconds?: number;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, retryAfterSeconds?: number) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 
@@ -75,10 +78,15 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   if (!res.ok) {
     if (res.status === 401 && token) onUnauthorized?.();
-    throw new ApiError(res.status, await readErrorMessage(res));
+    throw new ApiError(res.status, await readErrorMessage(res), retryAfter(res));
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+function retryAfter(res: Response): number | undefined {
+  const seconds = Number(res.headers.get("Retry-After"));
+  return res.headers.has("Retry-After") && Number.isFinite(seconds) ? seconds : undefined;
 }
 
 async function readErrorMessage(res: Response): Promise<string> {

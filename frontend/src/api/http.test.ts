@@ -71,6 +71,15 @@ describe("request", () => {
     expect(errorMessage(err)).toBe(SERVER_UNREACHABLE);
   });
 
+  it("reads how long to wait from a 429", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ message: "Too many requests" }), { status: 429, headers: { "Retry-After": "1200" } }),
+    );
+    const err = (await request("/x").catch((e: unknown) => e)) as ApiError;
+    expect(err.status).toBe(429);
+    expect(err.retryAfterSeconds).toBe(1200);
+  });
+
   it("lets an abort through untouched", async () => {
     const controller = new AbortController();
     controller.abort();

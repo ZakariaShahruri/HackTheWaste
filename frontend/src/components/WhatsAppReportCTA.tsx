@@ -12,15 +12,7 @@ interface Props {
 }
 
 export function WhatsAppReportCTA({ variant, message, className }: Props) {
-  if (!isWhatsAppConfigured()) {
-    return variant === "full" ? (
-      <div className={className}>
-        <p className="muted" style={{ fontSize: 13 }}>
-          WhatsApp reporting isn't configured yet — set VITE_WHATSAPP_NUMBER.
-        </p>
-      </div>
-    ) : null;
-  }
+  if (!isWhatsAppConfigured()) return null;
 
   const href = buildWhatsAppLink(message);
 
