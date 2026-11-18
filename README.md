@@ -165,7 +165,9 @@ The backend reads environment variables (see `backend/.env.example`):
 | `LEUVENGO_DEMO_RESET_CRON`        | optional     | When the demo resets, default `0 0 4 * * *`; `-` disables it  |
 
 The frontend reads `VITE_API_BASE_URL`, `VITE_WHATSAPP_NUMBER` and
-`VITE_WHATSAPP_JOIN_CODE` (see `frontend/.env.example`).
+`VITE_WHATSAPP_JOIN_CODE`, plus `SITE_URL` at build time for the absolute
+social preview image URL; Vercel builds use the production URL instead (see
+`frontend/.env.example`).
 
 ## API
 
