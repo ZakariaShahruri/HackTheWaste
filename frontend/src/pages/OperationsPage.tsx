@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { api } from "../api/client";
 import { errorMessage } from "../api/http";
+import type { WorkOrderDto } from "../api/types";
 import { useApi } from "../hooks/useApi";
 import { StatusTag } from "../components/StatusTag";
 import { HotspotMap } from "../components/Map/HotspotMap";
+import { AsyncContent } from "../components/AsyncContent";
+import { EmptyState } from "../components/States";
 
 export default function OperationsPage() {
   const orders = useApi((signal) => api.workOrders(signal));
@@ -27,32 +30,24 @@ export default function OperationsPage() {
 
   return (
     <div className="container">
-      <div className="spread" style={{ marginBottom: 16 }}>
+      <div className="page-header">
         <div>
-          <h1 style={{ fontSize: 28 }}>Crew operations queue</h1>
-          <div className="muted" style={{ marginTop: 4 }}>
+          <h1 className="page-title">Crew operations queue</h1>
+          <div className="muted page-subtitle">
             Dispatched via Planon · routed by district and cleanliness
           </div>
         </div>
       </div>
 
-      <section
-        className="grid"
-        style={{
-          gridTemplateColumns: "minmax(0, 1.2fr) minmax(0, 1fr)",
-          gap: 16,
-        }}
-      >
+      <section className="split split-even">
         <div className="card">
           <div className="card-header">
             <div>
               <div className="card-title">Active hotspots</div>
-              <h3 style={{ fontSize: 18, marginTop: 4 }}>
-                Targeted routing for cleaning crews & machinery
-              </h3>
+              <h3 className="card-heading">Targeted routing for cleaning crews & machinery</h3>
             </div>
           </div>
-          <HotspotMap hotspots={hotspots.data ?? []} height={420} />
+          <HotspotMap hotspots={hotspots.data ?? []} />
         </div>
 
         <div className="card">
@@ -62,57 +57,51 @@ export default function OperationsPage() {
               {actionError}
             </div>
           )}
-          <div className="stack" style={{ marginTop: 12 }}>
-            {(orders.data ?? []).map((w) => (
-              <div
-                key={w.id}
-                style={{
-                  border: "1px solid var(--pro-border)",
-                  borderRadius: 12,
-                  padding: 14,
-                }}
-              >
-                <div className="spread">
-                  <div>
-                    <div
-                      style={{
-                        fontFamily: "ui-monospace, Menlo, monospace",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {w.planonRef ?? `WO-${w.id}`}
-                    </div>
-                    <div className="muted" style={{ fontSize: 12 }}>
-                      {new Date(w.createdAt).toLocaleString()}
-                    </div>
-                  </div>
-                  <div className="row" style={{ gap: 6 }}>
-                    <StatusTag value={w.priority} />
-                    <StatusTag value={w.status} />
-                  </div>
+          <div style={{ marginTop: 12 }}>
+            <AsyncContent
+              state={orders}
+              empty={<EmptyState icon="✅" title="No work orders">Hotspots that reach three reports show up here.</EmptyState>}
+            >
+              {(list) => (
+                <div className="stack">
+                  {list.map((w) => (
+                    <WorkOrderCard
+                      key={w.id}
+                      order={w}
+                      busy={busyId === w.id}
+                      onComplete={() => void complete(w.id)}
+                    />
+                  ))}
                 </div>
-                <div style={{ marginTop: 8, fontSize: 14 }}>{w.summary}</div>
-                <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                  Crew: {w.crew}
-                </div>
-                {w.status !== "COMPLETED" && (
-                  <button
-                    className="btn btn-primary btn-sm"
-                    style={{ marginTop: 10 }}
-                    disabled={busyId === w.id}
-                    onClick={() => complete(w.id)}
-                  >
-                    {busyId === w.id ? "Marking..." : "Mark completed"}
-                  </button>
-                )}
-              </div>
-            ))}
-            {(orders.data?.length ?? 0) === 0 && (
-              <div className="muted">No active work orders.</div>
-            )}
+              )}
+            </AsyncContent>
           </div>
         </div>
       </section>
     </div>
+  );
+}
+
+function WorkOrderCard({ order: w, busy, onComplete }: { order: WorkOrderDto; busy: boolean; onComplete: () => void }) {
+  return (
+    <article className="work-order">
+      <div className="spread work-order-head">
+        <div>
+          <div className="mono work-order-ref">{w.planonRef ?? `WO-${w.id}`}</div>
+          <div className="muted work-order-time">{new Date(w.createdAt).toLocaleString("nl-BE")}</div>
+        </div>
+        <div className="row work-order-tags">
+          <StatusTag value={w.priority} />
+          <StatusTag value={w.status} />
+        </div>
+      </div>
+      <div className="work-order-summary">{w.summary}</div>
+      <div className="muted work-order-time">Crew: {w.crew ?? "unassigned"}</div>
+      {w.status !== "COMPLETED" && (
+        <button className="btn btn-primary btn-sm work-order-action" disabled={busy} onClick={onComplete}>
+          {busy ? "Marking…" : "Mark completed"}
+        </button>
+      )}
+    </article>
   );
 }

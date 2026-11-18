@@ -1,7 +1,9 @@
 import { Link } from "react-router";
 import { useApi } from "../hooks/useApi";
 import { api } from "../api/client";
+import { AsyncContent } from "../components/AsyncContent";
 import { PhotoCard } from "../components/PhotoCard";
+import { EmptyState, Skeleton } from "../components/States";
 import { WhatsAppReportCTA } from "../components/WhatsAppReportCTA";
 
 export default function LandingPage() {
@@ -11,8 +13,6 @@ export default function LandingPage() {
   const top = leaderboard?.[0];
 
   const feed = useApi((signal) => api.feed(0, 6, undefined, signal));
-  const feedPhotos = feed.data?.content ?? [];
-  const feedLoading = feed.loading;
 
   return (
     <div className="container landing">
@@ -88,27 +88,26 @@ export default function LandingPage() {
           </Link>
         </div>
 
-        {feedLoading ? (
-          <div className="feed-grid">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="feed-card feed-skeleton" />
-            ))}
-          </div>
-        ) : feedPhotos.length === 0 ? (
-          <div className="card" style={{ textAlign: "center", padding: 40, color: "var(--fg-soft)" }}>
-            <div style={{ fontSize: 40, marginBottom: 10 }}>🗑</div>
-            <div style={{ fontWeight: 600 }}>No reports yet</div>
-            <div style={{ fontSize: 13, marginTop: 4 }}>
-              Submit a report via WhatsApp to see photos here.
+        <AsyncContent
+          state={feed}
+          isEmpty={(page) => page.content.length === 0}
+          empty={
+            <div className="card">
+              <EmptyState icon="🗑" title="No reports yet">
+                Send one on WhatsApp or from your browser to see it here.
+              </EmptyState>
             </div>
-          </div>
-        ) : (
-          <div className="feed-grid">
-            {feedPhotos.map((p) => (
-              <PhotoCard key={p.id} photo={p} />
-            ))}
-          </div>
-        )}
+          }
+          loading={<div className="feed-grid"><Skeleton count={6} className="feed-card feed-skeleton" /></div>}
+        >
+          {(page) => (
+            <div className="feed-grid">
+              {page.content.map((p) => (
+                <PhotoCard key={p.id} photo={p} />
+              ))}
+            </div>
+          )}
+        </AsyncContent>
       </section>
     </div>
   );

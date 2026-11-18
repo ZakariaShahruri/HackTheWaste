@@ -7,9 +7,13 @@ import { PredictiveMap } from "../components/Map/PredictiveMap";
 import { Sparkbar } from "../components/Sparkbar";
 import { ScoreChip } from "../components/ScoreChip";
 import { StatusTag } from "../components/StatusTag";
+import { AsyncContent } from "../components/AsyncContent";
+import { EmptyState } from "../components/States";
+import { FacultySwatch } from "../components/FacultySwatch";
+
+const POLL = { pollMs: 5000 };
 
 export default function ProfessionalDashboard() {
-  const POLL = { pollMs: 5000 };
   const stats = useApi((signal) => api.stats(signal), POLL);
   const hotspots = useApi((signal) => api.hotspots(signal), POLL);
   const segments = useApi((signal) => api.segments(signal), POLL);
@@ -23,257 +27,184 @@ export default function ProfessionalDashboard() {
     return ["ALL", ...Array.from(set)];
   }, [segments.data]);
 
-  const filteredSegments = useMemo(() => {
-    if (!segments.data) return [];
-    if (district === "ALL") return segments.data;
-    return segments.data.filter((s) => s.district === district);
-  }, [segments.data, district]);
-
   return (
     <div className="container">
-      <div className="spread" style={{ marginBottom: 16 }}>
+      <div className="page-header">
         <div>
-          <h1 style={{ fontSize: 28 }}>Operations Overview</h1>
-          <div className="muted" style={{ marginTop: 4 }}>
-            Live cleanliness signals across Leuven · last refresh{" "}
-            {new Date().toLocaleTimeString()}
+          <h1 className="page-title">Operations Overview</h1>
+          <div className="muted page-subtitle">
+            Live cleanliness signals across Leuven · last refresh {new Date().toLocaleTimeString()}
           </div>
         </div>
-        <div className="row">
-          <div className="tabbar">
-            {districts.map((d) => (
-              <button
-                key={d}
-                className={d === district ? "active" : ""}
-                onClick={() => setDistrict(d)}
-              >
-                {d === "ALL" ? "All districts" : d}
-              </button>
-            ))}
-          </div>
-          <Link to="/pro/operations" className="btn btn-ghost btn-sm">
-            Operations queue
-          </Link>
-        </div>
+        <Link to="/pro/operations" className="btn btn-ghost btn-sm">
+          Operations queue
+        </Link>
       </div>
 
-      <section
-        className="grid"
-        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}
-      >
-        <Kpi
-          label="Total reports (72h)"
-          value={stats.data?.totalReports ?? "—"}
-          sub="anonymized signals"
-        />
-        <Kpi
-          label="Active hotspots"
-          value={stats.data?.openHotspots ?? "—"}
-          sub="post-clustering"
-        />
+      <section className="kpi-grid">
+        <Kpi label="Total reports (72h)" value={stats.data?.totalReports ?? "—"} sub="anonymized signals" />
+        <Kpi label="Active hotspots" value={stats.data?.openHotspots ?? "—"} sub="post-clustering" />
         <Kpi
           label="Planon orders dispatched"
           value={stats.data?.dispatchedOrders ?? "—"}
           sub={`${stats.data?.completedOrders ?? 0} completed`}
         />
-        <Kpi
-          label="City AI cleanliness"
-          value={stats.data?.avgCleanliness?.toFixed(1) ?? "—"}
-          sub="0–100 weighted score"
-        />
+        <Kpi label="City AI cleanliness" value={stats.data?.avgCleanliness?.toFixed(1) ?? "—"} sub="0–100 weighted score" />
       </section>
 
-      {/* ── Main map card (full width) ── */}
-      <section className="card" style={{ marginTop: 16 }}>
+      <section className="card section">
         <div className="card-header">
           <div>
             <div className="card-title">
               {mapMode === "live" ? "Live hotspot map" : "Predictive heatmap · ML forecast"}
             </div>
-            <h3 style={{ fontSize: 18, marginTop: 4 }}>
-              {mapMode === "live"
-                ? "Where to send crews now"
-                : "Where trash will accumulate — pick a day & time"}
+            <h3 className="card-heading">
+              {mapMode === "live" ? "Where to send crews now" : "Where trash will accumulate — pick a day & time"}
             </h3>
           </div>
           <div className="tabbar">
-            <button
-              className={mapMode === "predictive" ? "active" : ""}
-              onClick={() => setMapMode("predictive")}
-            >
+            <button className={mapMode === "predictive" ? "active" : ""} onClick={() => setMapMode("predictive")}>
               Predictive
             </button>
-            <button
-              className={mapMode === "live" ? "active" : ""}
-              onClick={() => setMapMode("live")}
-            >
+            <button className={mapMode === "live" ? "active" : ""} onClick={() => setMapMode("live")}>
               Live hotspots
             </button>
           </div>
         </div>
-        {mapMode === "live" ? (
-          <HotspotMap hotspots={hotspots.data ?? []} height={560} />
-        ) : (
-          <PredictiveMap height={560} />
-        )}
+        {mapMode === "live" ? <HotspotMap hotspots={hotspots.data ?? []} /> : <PredictiveMap />}
       </section>
 
-      {/* ── Secondary row: trend + top clusters ── */}
-      <section
-        className="grid"
-        style={{ marginTop: 16, gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1fr)" }}
-      >
+      <section className="split">
         <div className="card">
           <div className="card-header">
             <div className="card-title">Reports trend (7d)</div>
-            <span className="muted" style={{ fontSize: 12 }}>ingested signals</span>
+            <span className="muted table-sub">ingested signals</span>
           </div>
           <Sparkbar data={stats.data?.reportsLast7Days ?? []} />
         </div>
 
         <div className="card">
           <div className="card-title">Top clusters</div>
-          <div className="stack" style={{ marginTop: 8 }}>
-            {(stats.data?.topHotspots ?? []).slice(0, 5).map((h) => (
-              <div key={h.id} className="spread">
-                <div>
-                  <div style={{ fontWeight: 600 }}>{h.label ?? "Hotspot"}</div>
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    {h.reportCount} reports · cleanliness {Math.round(h.cleanliness)}/100
-                  </div>
+          <div style={{ marginTop: 8 }}>
+            <AsyncContent
+              state={stats}
+              isEmpty={(s) => s.topHotspots.length === 0}
+              empty={<EmptyState title="All clear ✨" />}
+            >
+              {(s) => (
+                <div className="stack">
+                  {s.topHotspots.slice(0, 5).map((h) => (
+                    <div key={h.id} className="spread">
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{h.label ?? "Hotspot"}</div>
+                        <div className="muted table-sub">
+                          {h.reportCount} reports · cleanliness {Math.round(h.cleanliness)}/100
+                        </div>
+                      </div>
+                      <StatusTag value={h.status} />
+                    </div>
+                  ))}
                 </div>
-                <StatusTag value={h.status} />
-              </div>
-            ))}
-            {(stats.data?.topHotspots?.length ?? 0) === 0 && (
-              <div className="muted">All clear ✨</div>
-            )}
+              )}
+            </AsyncContent>
           </div>
         </div>
       </section>
 
-      <section className="card" style={{ marginTop: 16 }}>
+      <section className="card section">
         <div className="card-header">
           <div>
             <div className="card-title">AI cleanliness scores by segment</div>
-            <h3 style={{ fontSize: 18, marginTop: 4 }}>
-              Streets ranked by current need
-            </h3>
+            <h3 className="card-heading">Streets ranked by current need</h3>
+          </div>
+          <div className="tabbar">
+            {districts.map((d) => (
+              <button key={d} className={d === district ? "active" : ""} onClick={() => setDistrict(d)}>
+                {d === "ALL" ? "All districts" : d}
+              </button>
+            ))}
           </div>
         </div>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Segment</th>
-              <th>District</th>
-              <th>Reports (72h)</th>
-              <th>Held by</th>
-              <th>AI score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[...filteredSegments]
-              .sort((a, b) => a.aiCleanlinessScore - b.aiCleanlinessScore)
-              .map((s) => (
-                <tr key={s.id}>
-                  <td>
-                    <strong>{s.name}</strong>
-                  </td>
-                  <td className="muted">{s.district ?? "—"}</td>
-                  <td>{s.recentReportCount ?? 0}</td>
-                  <td>
-                    {s.facultyName ? (
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          gap: 6,
-                          alignItems: "center",
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: 3,
-                            background: s.facultyColor ?? "#ccc",
-                          }}
-                        />
-                        {s.facultyName}
-                      </span>
-                    ) : (
-                      <span className="muted">—</span>
-                    )}
-                  </td>
-                  <td>
-                    <ScoreChip score={s.aiCleanlinessScore ?? 0} />
-                  </td>
-                </tr>
-              ))}
-          </tbody>
-        </table>
+        <AsyncContent state={segments} empty={<EmptyState title="No streets scored yet" />}>
+          {(list) => (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Segment</th>
+                    <th>District</th>
+                    <th>Reports (72h)</th>
+                    <th>Held by</th>
+                    <th>AI score</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list
+                    .filter((s) => district === "ALL" || s.district === district)
+                    .sort((a, b) => a.aiCleanlinessScore - b.aiCleanlinessScore)
+                    .map((s) => (
+                      <tr key={s.id}>
+                        <td><strong>{s.name}</strong></td>
+                        <td className="muted">{s.district ?? "—"}</td>
+                        <td>{s.recentReportCount ?? 0}</td>
+                        <td><FacultySwatch name={s.facultyName} color={s.facultyColor} /></td>
+                        <td><ScoreChip score={s.aiCleanlinessScore ?? 0} /></td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </AsyncContent>
       </section>
 
-      <section className="card" style={{ marginTop: 16 }}>
+      <section className="card section">
         <div className="card-header">
           <div>
             <div className="card-title">Recent Planon work orders</div>
-            <h3 style={{ fontSize: 18, marginTop: 4 }}>
-              Auto-dispatched from clustered reports
-            </h3>
+            <h3 className="card-heading">Auto-dispatched from clustered reports</h3>
           </div>
           <Link to="/pro/operations" className="btn btn-ghost btn-sm">
             See all
           </Link>
         </div>
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Planon ref</th>
-              <th>Summary</th>
-              <th>Crew</th>
-              <th>Priority</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {(orders.data ?? []).slice(0, 6).map((w) => (
-              <tr key={w.id}>
-                <td style={{ fontFamily: "ui-monospace, Menlo, monospace" }}>
-                  {w.planonRef ?? "PENDING"}
-                </td>
-                <td>{w.summary}</td>
-                <td>{w.crew ?? "—"}</td>
-                <td>
-                  <StatusTag value={w.priority} />
-                </td>
-                <td>
-                  <StatusTag value={w.status} />
-                </td>
-              </tr>
-            ))}
-            {(orders.data?.length ?? 0) === 0 && (
-              <tr>
-                <td colSpan={5} className="muted">
-                  No orders yet - report something to see the pipeline fire.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <AsyncContent
+          state={orders}
+          empty={<EmptyState title="No work orders yet">Three reports at one spot dispatch a crew.</EmptyState>}
+        >
+          {(list) => (
+            <div className="table-wrap">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Planon ref</th>
+                    <th>Summary</th>
+                    <th>Crew</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {list.slice(0, 6).map((w) => (
+                    <tr key={w.id}>
+                      <td className="mono">{w.planonRef ?? "PENDING"}</td>
+                      <td>{w.summary}</td>
+                      <td>{w.crew ?? "—"}</td>
+                      <td><StatusTag value={w.priority} /></td>
+                      <td><StatusTag value={w.status} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </AsyncContent>
       </section>
     </div>
   );
 }
 
-function Kpi({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string | number;
-  sub: string;
-}) {
+function Kpi({ label, value, sub }: { label: string; value: string | number; sub: string }) {
   return (
     <div className="card">
       <div className="card-title">{label}</div>

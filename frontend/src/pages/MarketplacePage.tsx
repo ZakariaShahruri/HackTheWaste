@@ -3,7 +3,9 @@ import { Link } from "react-router";
 import { api } from "../api/client";
 import { errorMessage } from "../api/http";
 import type { RedemptionDto, RewardItemDto } from "../api/types";
+import { AsyncContent } from "../components/AsyncContent";
 import { RewardCard } from "../components/RewardCard";
+import { EmptyState, Skeleton } from "../components/States";
 import { VoucherList } from "../components/VoucherList";
 import { useAuth } from "../context/auth";
 import { useApi } from "../hooks/useApi";
@@ -51,10 +53,10 @@ export default function MarketplacePage() {
 
   return (
     <div className="container">
-      <div className="spread" style={{ flexWrap: "wrap", gap: 12 }}>
+      <div className="page-header">
         <div>
-          <h1 style={{ fontSize: 28 }}>Reward marketplace</h1>
-          <div className="muted" style={{ marginTop: 4 }}>
+          <h1 className="page-title">Reward marketplace</h1>
+          <div className="muted page-subtitle">
             {user
               ? `You have ${user.points} pts. Every report you send while logged in earns more.`
               : "Log in and report litter to earn points, then spend them on Leuven perks."}
@@ -80,7 +82,7 @@ export default function MarketplacePage() {
         </div>
       )}
 
-      <div className="tabbar" style={{ marginTop: 16 }}>
+      <div className="tabbar">
         {categories.map((c) => (
           <button
             key={c}
@@ -92,23 +94,25 @@ export default function MarketplacePage() {
         ))}
       </div>
 
-      <section
-        className="grid"
-        style={{
-          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-          marginTop: 16,
-        }}
+      <AsyncContent
+        state={rewards}
+        loading={<div className="reward-grid"><Skeleton count={3} className="reward-skeleton" /></div>}
+        empty={<div className="card"><EmptyState icon="🎁" title="No rewards on offer right now" /></div>}
       >
-        {visible.map((r) => (
-          <RewardCard
-            key={r.id}
-            reward={r}
-            blocker={redeemBlocker(r, user)}
-            busy={busyId === r.id}
-            onRedeem={(reward) => void redeem(reward)}
-          />
-        ))}
-      </section>
+        {() => (
+          <section className="reward-grid">
+            {visible.map((r) => (
+              <RewardCard
+                key={r.id}
+                reward={r}
+                blocker={redeemBlocker(r, user)}
+                busy={busyId === r.id}
+                onRedeem={(reward) => void redeem(reward)}
+              />
+            ))}
+          </section>
+        )}
+      </AsyncContent>
 
       {user && (mine.data?.length ?? 0) > 0 && (
         <section style={{ marginTop: 32 }}>

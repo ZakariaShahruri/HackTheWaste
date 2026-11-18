@@ -3,6 +3,7 @@ import { api } from "../api/client";
 import { errorMessage } from "../api/http";
 import { useApi } from "../hooks/useApi";
 import { PhotoCard } from "../components/PhotoCard";
+import { EmptyState, ErrorState, Skeleton } from "../components/States";
 import type { FeedItemDto } from "../api/types";
 
 const PAGE_SIZE = 12;
@@ -14,11 +15,11 @@ export default function FeedPage() {
 
   return (
     <div className="container" style={{ maxWidth: 1100 }}>
-      <div className="spread" style={{ marginBottom: 20 }}>
+      <div className="page-header">
         <div>
-          <h1 style={{ fontSize: 28 }}>Leuven Feed</h1>
-          <div className="muted" style={{ marginTop: 4, fontSize: 14 }}>
-            {total ?? "—"} trash reports captured across Leuven
+          <h1 className="page-title">Leuven Feed</h1>
+          <div className="muted page-subtitle">
+            {total === null ? "Litter reports" : `${total} litter reports`} captured across Leuven
           </div>
         </div>
       </div>
@@ -65,6 +66,7 @@ function FeedResults({ clan, onTotal }: { clan?: string; onTotal: (n: number) =>
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -83,29 +85,29 @@ function FeedResults({ clan, onTotal }: { clan?: string; onTotal: (n: number) =>
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [pages, clan, onTotal]);
+  }, [pages, clan, onTotal, attempt]);
 
   function loadMore() {
     setLoading(true);
     setPages((n) => n + 1);
   }
 
+  function retry() {
+    setError(null);
+    setLoading(true);
+    setAttempt((n) => n + 1);
+  }
+
   if (error && photos.length === 0) {
-    return (
-      <div className="card" style={{ textAlign: "center", padding: 48, color: "var(--fg-soft)" }}>
-        <div style={{ fontWeight: 600 }}>{error}</div>
-      </div>
-    );
+    return <div className="card"><ErrorState message={error} onRetry={retry} /></div>;
   }
 
   if (photos.length === 0 && !loading) {
     return (
-      <div className="card" style={{ textAlign: "center", padding: 48, color: "var(--fg-soft)" }}>
-        <div style={{ fontSize: 48, marginBottom: 12 }}>🗑</div>
-        <div style={{ fontWeight: 600 }}>No reports yet for this filter</div>
-        <div style={{ fontSize: 14, marginTop: 6 }}>
-          Send a report via WhatsApp or try it in your browser to see photos here.
-        </div>
+      <div className="card">
+        <EmptyState icon="🗑" title={clan ? `No reports for ${clan} yet` : "No reports yet"}>
+          Send one on WhatsApp or from your browser to see it here.
+        </EmptyState>
       </div>
     );
   }
@@ -116,18 +118,19 @@ function FeedResults({ clan, onTotal }: { clan?: string; onTotal: (n: number) =>
         {photos.map((p) => (
           <PhotoCard key={p.id} photo={p} />
         ))}
-        {loading &&
-          Array.from({ length: 6 }).map((_, i) => (
-            <div key={`sk-${i}`} className="feed-card feed-skeleton" />
-          ))}
+        {loading && <Skeleton count={6} className="feed-card feed-skeleton" />}
       </div>
 
-      {hasMore && !loading && photos.length > 0 && (
-        <div style={{ textAlign: "center", marginTop: 32 }}>
-          <button className="btn btn-ghost" onClick={loadMore}>
-            Load more
-          </button>
-        </div>
+      {error ? (
+        <ErrorState message={error} onRetry={retry} />
+      ) : (
+        hasMore && !loading && (
+          <div className="feed-more">
+            <button className="btn btn-ghost" onClick={loadMore}>
+              Load more
+            </button>
+          </div>
+        )
       )}
     </>
   );

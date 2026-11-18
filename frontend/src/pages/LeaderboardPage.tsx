@@ -1,94 +1,65 @@
 import { Link } from "react-router";
 import { api } from "../api/client";
+import type { LeaderboardEntry } from "../api/types";
 import { useApi } from "../hooks/useApi";
+import { AsyncContent } from "../components/AsyncContent";
+import { EmptyState } from "../components/States";
+
+const MEDALS = ["🥇", "🥈", "🥉"];
 
 export default function LeaderboardPage() {
   const board = useApi((signal) => api.leaderboard(signal));
-  const max = Math.max(1, ...(board.data ?? []).map((e) => e.points));
 
   return (
     <div className="container">
-      <div className="spread">
+      <div className="page-header">
         <div>
-          <h1 style={{ fontSize: 28 }}>Faculty clans · Leuven Go</h1>
-          <div className="muted" style={{ marginTop: 4 }}>
+          <h1 className="page-title">Faculty clans · Leuven Go</h1>
+          <div className="muted page-subtitle">
             Every report scores points for your faculty. Cleaner streets win.
           </div>
         </div>
         <Link to="/report" className="btn btn-accent btn-sm">
-          📱 Report on WhatsApp
+          📱 Report litter
         </Link>
       </div>
 
-      <section className="card" style={{ marginTop: 16 }}>
-        <div className="stack">
-          {(board.data ?? []).map((e, i) => (
-            <div
-              key={e.id}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "60px 60px 1fr 90px",
-                alignItems: "center",
-                gap: 16,
-                padding: "12px 14px",
-                borderRadius: 16,
-                background:
-                  i === 0
-                    ? "linear-gradient(120deg, #fef3c7, #fde68a)"
-                    : "var(--bg-soft)",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 22,
-                  fontWeight: 800,
-                  textAlign: "center",
-                  color: i < 3 ? "#b45309" : "var(--fg-soft)",
-                }}
-              >
-                {i < 3 ? ["🥇", "🥈", "🥉"][i] : `#${e.rank}`}
-              </div>
-              <div style={{ fontSize: 32, textAlign: "center" }}>{e.emoji}</div>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 700 }}>{e.name}</div>
-                <div className="muted" style={{ fontSize: 12 }}>
-                  Clan {e.shortCode}
-                </div>
-                <div
-                  style={{
-                    marginTop: 8,
-                    height: 6,
-                    background: "rgba(0,0,0,0.06)",
-                    borderRadius: 4,
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: `${(e.points / max) * 100}%`,
-                      height: "100%",
-                      background: e.color,
-                    }}
-                  />
-                </div>
-              </div>
-              <div
-                style={{
-                  fontSize: 22,
-                  fontWeight: 800,
-                  color: e.color,
-                  textAlign: "right",
-                }}
-              >
-                {e.points}
-                <div className="muted" style={{ fontSize: 11, fontWeight: 500 }}>
-                  pts
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+      <section className="card">
+        <AsyncContent state={board} empty={<EmptyState icon="🏆" title="No clans yet" />}>
+          {(entries) => {
+            const max = Math.max(1, ...entries.map((e) => e.points));
+            return (
+              <ol className="board">
+                {entries.map((e, i) => (
+                  <BoardRow key={e.id} entry={e} leader={i === 0} share={e.points / max} />
+                ))}
+              </ol>
+            );
+          }}
+        </AsyncContent>
       </section>
     </div>
+  );
+}
+
+function BoardRow({ entry: e, leader, share }: { entry: LeaderboardEntry; leader: boolean; share: number }) {
+  return (
+    <li className={`board-row${leader ? " board-leader" : ""}`}>
+      <div className={`board-rank${e.rank <= 3 ? " top" : ""}`}>
+        {e.rank <= 3 ? MEDALS[e.rank - 1] : `#${e.rank}`}
+      </div>
+      <div className="board-emoji" aria-hidden>{e.emoji}</div>
+      <div className="board-name">
+        <div className="board-title">{e.name}</div>
+        <div className="muted board-code">Clan {e.shortCode}</div>
+        <div className="board-bar">
+          <div style={{ width: `${share * 100}%`, background: e.color }} />
+        </div>
+      </div>
+      <div className="board-points" style={{ color: e.color }}>
+        {e.points}
+        <div className="muted board-unit">pts</div>
+      </div>
+    </li>
   );
 }
