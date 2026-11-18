@@ -157,8 +157,13 @@ textarea {
   transition: transform 80ms ease;
 }
 
-.btn:hover {
+.btn:hover:not(:disabled) {
   transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .btn-primary {
@@ -1154,4 +1159,71 @@ textarea {
   color: var(--primary);
   font-weight: 600;
   cursor: pointer;
+}
+
+.topbar-points {
+  padding: 2px 8px;
+  white-space: nowrap;
+  border-radius: 999px;
+  background: var(--bg-soft);
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.reward-art {
+  height: 140px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font-size: 56px;
+  color: white;
+}
+
+.reward-action {
+  white-space: nowrap;
+}
+
+.reward-stock,
+.reward-sponsor {
+  font-size: 12px;
+  color: var(--fg-soft);
+}
+
+.redeem-success {
+  margin-top: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-color: var(--success);
+}
+
+.voucher-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  gap: 8px;
+}
+
+.voucher {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--bg-soft);
+}
+
+.voucher-code {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px dashed var(--fg-soft);
+  user-select: all;
 }

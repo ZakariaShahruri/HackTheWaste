@@ -62,6 +62,21 @@ export interface WorkOrderDto {
   completedAt?: string;
 }
 
+export interface RedemptionDto {
+  id: number;
+  rewardId: number;
+  title: string;
+  sponsor: string;
+  voucherCode: string;
+  costPoints: number;
+  redeemedAt: string;
+}
+
+export interface RedeemResponse {
+  redemption: RedemptionDto;
+  pointsLeft: number;
+}
+
 export interface RewardItemDto {
   id: number;
   title: string;
@@ -124,6 +139,8 @@ export interface AuthUser {
   email: string;
   facultyShortCode?: string;
   role: Role;
+  /** Personal points, earned by their own reports and spent on rewards. */
+  points: number;
   /** Only returned by login/register; kept client-side afterwards. */
   token: string;
 }

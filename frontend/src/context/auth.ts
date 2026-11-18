@@ -7,6 +7,8 @@ export interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, facultyShortCode?: string) => Promise<void>;
   logout: () => Promise<void>;
+  /** Updates the shown balance after spending points, without a round trip. */
+  setPoints: (points: number) => void;
 }
 
 export const AuthContext = createContext<AuthContextType | null>(null);

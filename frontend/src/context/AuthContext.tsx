@@ -67,9 +67,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persist(null);
   }, [persist]);
 
+  const setPoints = useCallback(
+    (points: number) => {
+      const current = readStoredUser();
+      if (current) persist({ ...current, points });
+    },
+    [persist],
+  );
+
   const value = useMemo(
-    () => ({ user, loading, login, register, logout }),
-    [user, loading, login, register, logout],
+    () => ({ user, loading, login, register, logout, setPoints }),
+    [user, loading, login, register, logout, setPoints],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

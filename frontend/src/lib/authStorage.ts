@@ -5,7 +5,10 @@ const STORAGE_KEY = "leuvengo.auth";
 export function readStoredUser(): AuthUser | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as AuthUser) : null;
+    if (!raw) return null;
+    const user = JSON.parse(raw) as AuthUser;
+    // Sessions stored before points existed; /auth/me fills in the real balance.
+    return { ...user, points: user.points ?? 0 };
   } catch {
     return null;
   }

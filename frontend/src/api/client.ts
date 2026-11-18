@@ -6,6 +6,8 @@ import type {
   HotspotDto,
   LeaderboardEntry,
   PredictionGrid,
+  RedeemResponse,
+  RedemptionDto,
   RewardItemDto,
   StatsDto,
   StreetSegmentDto,
@@ -35,6 +37,8 @@ export const api = {
   completeWorkOrder: (id: number) =>
     request<WorkOrderDto>(`/work-orders/${id}/complete`, { method: "POST" }),
   rewards: (signal?: Signal) => request<RewardItemDto[]>("/rewards", { signal }),
+  redeemReward: (id: number) => request<RedeemResponse>(`/rewards/${id}/redeem`, { method: "POST" }),
+  myRedemptions: (signal?: Signal) => request<RedemptionDto[]>("/rewards/mine", { signal }),
   feed: (page = 0, size = 12, clan?: string, signal?: Signal) => {
     const params = new URLSearchParams({ page: String(page), size: String(size) });
     if (clan) params.set("clan", clan);

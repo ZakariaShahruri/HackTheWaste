@@ -30,7 +30,7 @@ describe("request", () => {
   });
 
   it("sends JSON bodies and the bearer token", async () => {
-    writeStoredUser({ id: 1, email: "a@b.c", role: "USER", token: "t0k" });
+    writeStoredUser({ id: 1, email: "a@b.c", role: "USER", points: 0, token: "t0k" });
     fetchMock.mockResolvedValue(jsonResponse(200, {}));
     await request("/x", { method: "POST", json: { a: 1 } });
 
@@ -65,7 +65,7 @@ describe("request", () => {
     await request("/x").catch(() => {});
     expect(listener).not.toHaveBeenCalled();
 
-    writeStoredUser({ id: 1, email: "a@b.c", role: "USER", token: "expired" });
+    writeStoredUser({ id: 1, email: "a@b.c", role: "USER", points: 0, token: "expired" });
     fetchMock.mockResolvedValue(jsonResponse(401, {}));
     await request("/x").catch(() => {});
     expect(listener).toHaveBeenCalledOnce();

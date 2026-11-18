@@ -68,6 +68,7 @@ function AuthArea() {
         {user.facultyShortCode ? `${user.facultyShortCode} · ` : ""}
         {user.email.split("@")[0]}
       </span>
+      <span className="topbar-points">{user.points} pts</span>
       <button
         className="btn btn-ghost btn-sm"
         onClick={() => void logout().then(() => navigate("/"))}
