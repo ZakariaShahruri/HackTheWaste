@@ -72,15 +72,11 @@ public class PlanonService {
         return workOrders.save(saved);
     }
 
+    /**
+     * Stand-in for Planon's order API. A real integration would POST the order
+     * to Planon with a RestClient and return the reference it hands back.
+     */
     private String callPlanonRest(WorkOrder w) {
-        // Real impl:
-        //   RestClient.create(props.getPlanon().getBaseUrl())
-        //       .post()
-        //       .uri("/Order/Create")
-        //       .header("Authorization", "Bearer " + props.getPlanon().getApiKey())
-        //       .body(map)
-        //       .retrieve()
-        //       .body(PlanonResponse.class);
         log.info("[PLANON-MOCK] dispatching workOrder={} priority={} crew={}",
                 w.getId(), w.getPriority(), w.getCrew());
         return "PLN-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
