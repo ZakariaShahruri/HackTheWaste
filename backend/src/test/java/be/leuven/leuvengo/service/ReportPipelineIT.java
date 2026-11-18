@@ -35,6 +35,7 @@ class ReportPipelineIT {
     @Autowired StreetSegmentRepository segments;
     @Autowired FacultyRepository faculties;
     @Autowired WorkOrderRepository workOrders;
+    @Autowired WorkOrderService workOrderService;
     @Autowired Clock clock;
 
     @Test
@@ -71,6 +72,19 @@ class ReportPipelineIT {
         assertThat(dispatched.getReportCount()).isEqualTo(4);
         assertThat(workOrders.findAll())
                 .filteredOn(w -> w.getHotspot().getId().equals(dispatched.getId()))
+                .hasSize(1);
+    }
+
+    @Test
+    void dispatchingByHandTwiceOrdersOneCrew() {
+        Hotspot hotspot = submit(10).getHotspot();
+
+        Long first = workOrderService.dispatch(hotspot.getId()).id();
+        Long second = workOrderService.dispatch(hotspot.getId()).id();
+
+        assertThat(second).isEqualTo(first);
+        assertThat(workOrders.findAll())
+                .filteredOn(w -> w.getHotspot().getId().equals(hotspot.getId()))
                 .hasSize(1);
     }
 
