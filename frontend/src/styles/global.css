@@ -113,6 +113,16 @@ textarea {
   box-shadow: 0 6px 14px rgba(15, 118, 110, 0.35);
 }
 
+.topbar-menu {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.menu-toggle {
+  display: none;
+}
+
 .nav {
   display: flex;
   gap: 6px;
@@ -419,6 +429,8 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
   margin-bottom: 14px;
 }
 
@@ -522,10 +534,11 @@ textarea {
   z-index: 1;
 }
 
+/* Top right, clear of the attribution and the floating WhatsApp button. */
 .legend {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   background: rgba(255, 255, 255, 0.96);
   color: #1f2937;
   padding: 10px 12px;
@@ -558,6 +571,11 @@ textarea {
 /* table */
 .table-wrap {
   overflow-x: auto;
+}
+
+/* Scroll sideways on a phone rather than squash every column. */
+.table-wrap .table {
+  min-width: 560px;
 }
 
 .table {
@@ -979,8 +997,12 @@ textarea {
   background: var(--bg-soft);
 }
 
+/* One row that scrolls sideways when it doesn't fit, e.g. categories on a phone. */
 .tabbar {
   display: inline-flex;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
   background: var(--bg-soft);
   padding: 4px;
   border-radius: 999px;
@@ -988,6 +1010,8 @@ textarea {
 }
 
 .tabbar button {
+  flex-shrink: 0;
+  white-space: nowrap;
   border: none;
   background: transparent;
   padding: 6px 14px;
@@ -1210,18 +1234,6 @@ textarea {
   }
   .landing-choice {
     grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 720px) {
-  .topbar {
-    padding: 10px 16px;
-  }
-  .container {
-    width: calc(100% - 24px);
-  }
-  .hero {
-    padding: 36px 22px;
   }
 }
 
@@ -1869,4 +1881,139 @@ textarea {
 .verdict-actions {
   flex-wrap: wrap;
   margin-top: 16px;
+}
+
+/* phones and small tablets; last, so it overrides the rules above */
+@media (max-width: 900px) {
+  .split,
+  .split-even {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .topbar {
+    flex-wrap: wrap;
+    padding: 10px 16px;
+  }
+  .menu-toggle {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: transparent;
+    color: inherit;
+    font-size: 18px;
+  }
+  .theme-pro .menu-toggle {
+    border-color: var(--pro-border);
+  }
+  .topbar-menu {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding-top: 12px;
+  }
+  .topbar.open .topbar-menu {
+    display: flex;
+  }
+  .nav {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .nav a,
+  .nav button {
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 15px;
+  }
+  .topbar-auth {
+    flex-wrap: wrap;
+    border-left: 0;
+    padding-left: 0;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+  .theme-pro .topbar-auth {
+    border-top-color: var(--pro-border);
+  }
+  .container {
+    width: calc(100% - 32px);
+    margin: 16px auto;
+  }
+  .page-title {
+    font-size: 24px;
+  }
+  .card {
+    padding: 16px;
+  }
+  .student-hero-title {
+    padding: 18px 16px 16px;
+  }
+  .student-hero-title h1 {
+    font-size: 22px;
+  }
+  .clan-picker {
+    padding: 12px 16px;
+  }
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 12px 16px 16px;
+  }
+  .stat-value {
+    font-size: 18px;
+  }
+  .kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  .kpi-value {
+    font-size: 26px;
+  }
+  .board-row {
+    grid-template-columns: 32px 32px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 10px;
+  }
+  .board-rank,
+  .board-points {
+    font-size: 17px;
+  }
+  .board-emoji {
+    font-size: 24px;
+  }
+  .board-title {
+    font-size: 15px;
+  }
+  .verdict {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .predictive-hour-row {
+    flex-wrap: wrap;
+  }
+  .predictive-status {
+    min-width: 0;
+    width: 100%;
+    text-align: left;
+  }
+  .legend {
+    font-size: 11px;
+    padding: 6px 8px;
+    line-height: 1.45;
+  }
+  .wa-float-btn {
+    width: 48px;
+    height: 48px;
+    right: 16px;
+    bottom: 16px;
+    font-size: 20px;
+  }
+  .wa-float-popover {
+    right: 16px;
+    bottom: 72px;
+  }
 }

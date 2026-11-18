@@ -1,48 +1,71 @@
+import { useState, type MouseEvent } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router";
 import { useAuth } from "../context/auth";
 
+type Mode = "landing" | "pro" | "student";
+
+function modeFor(pathname: string): Mode {
+  if (pathname.startsWith("/pro")) return "pro";
+  if (["/", "/login", "/signup"].includes(pathname)) return "landing";
+  return "student";
+}
+
 export function TopBar() {
   const { pathname } = useLocation();
-  const mode: "landing" | "pro" | "student" = pathname.startsWith("/pro")
-    ? "pro"
-    : pathname === "/" || pathname === "" || pathname === "/login" || pathname === "/signup"
-      ? "landing"
-      : "student";
+  const mode = modeFor(pathname);
+  const [open, setOpen] = useState(false);
+
+  // On small screens the links live in a drop-down; following one closes it.
+  const closeOnLink = (e: MouseEvent) => {
+    if ((e.target as HTMLElement).closest("a, button")) setOpen(false);
+  };
 
   return (
-    <header className="topbar">
+    <header className={`topbar${open ? " open" : ""}`}>
       <NavLink to="/" className="brand">
         <span className="brand-mark">LG</span>
         <span>Leuven Go</span>
       </NavLink>
 
-      <div className="row" style={{ gap: 6 }}>
-        {mode === "landing" && (
-          <nav className="nav">
-            <NavLink to="/pro">For city teams</NavLink>
-            <NavLink to="/student">For students</NavLink>
-            <NavLink to="/feed">Feed</NavLink>
-          </nav>
-        )}
+      <button
+        type="button"
+        className="menu-toggle"
+        aria-expanded={open}
+        aria-controls="topbar-menu"
+        aria-label={open ? "Close menu" : "Open menu"}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {open ? "✕" : "☰"}
+      </button>
 
-        {mode === "pro" && (
-          <nav className="nav">
-            <NavLink to="/pro" end>Overview</NavLink>
-            <NavLink to="/pro/operations">Operations</NavLink>
-            <NavLink to="/student" className="btn btn-ghost btn-sm">Switch view</NavLink>
-          </nav>
-        )}
-
-        {mode === "student" && (
-          <nav className="nav">
-            <NavLink to="/student" end>Map</NavLink>
-            <NavLink to="/student/leaderboard">Clans</NavLink>
-            <NavLink to="/market">Rewards</NavLink>
-            <NavLink to="/feed">Feed</NavLink>
-            <NavLink to="/pro" className="btn btn-ghost btn-sm">Switch view</NavLink>
-          </nav>
-        )}
-
+      <div id="topbar-menu" className="topbar-menu" onClick={closeOnLink}>
+        <nav className="nav" aria-label="Main">
+          {mode === "landing" && (
+            <>
+              <NavLink to="/pro">For city teams</NavLink>
+              <NavLink to="/student">For students</NavLink>
+              <NavLink to="/feed">Feed</NavLink>
+              <NavLink to="/report">Report</NavLink>
+            </>
+          )}
+          {mode === "pro" && (
+            <>
+              <NavLink to="/pro" end>Overview</NavLink>
+              <NavLink to="/pro/operations">Operations</NavLink>
+              <NavLink to="/student" className="btn btn-ghost btn-sm">Student view</NavLink>
+            </>
+          )}
+          {mode === "student" && (
+            <>
+              <NavLink to="/student" end>Map</NavLink>
+              <NavLink to="/student/leaderboard">Clans</NavLink>
+              <NavLink to="/market">Rewards</NavLink>
+              <NavLink to="/feed">Feed</NavLink>
+              <NavLink to="/report">Report</NavLink>
+              <NavLink to="/pro" className="btn btn-ghost btn-sm">City view</NavLink>
+            </>
+          )}
+        </nav>
         <AuthArea />
       </div>
     </header>
@@ -69,10 +92,7 @@ function AuthArea() {
         {user.email.split("@")[0]}
       </span>
       <span className="topbar-points">{user.points} pts</span>
-      <button
-        className="btn btn-ghost btn-sm"
-        onClick={() => void logout().then(() => navigate("/"))}
-      >
+      <button className="btn btn-ghost btn-sm" onClick={() => void logout().then(() => navigate("/"))}>
         Log out
       </button>
     </div>
