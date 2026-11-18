@@ -20,8 +20,9 @@ spring:
       path: /h2-console
   servlet:
     multipart:
-      max-file-size: 8MB
-      max-request-size: 8MB
+      # browser demo uploads; photos are downscaled to <= 1280px right after
+      max-file-size: 5MB
+      max-request-size: 6MB
 
 leuvengo:
   traffic:
