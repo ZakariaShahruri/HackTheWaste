@@ -1,3 +1,4 @@
+import "leaflet/dist/leaflet.css";
 import type { ReactNode } from "react";
 import { MapContainer, ScaleControl, TileLayer, useMapEvents } from "react-leaflet";
 import { LEUVEN_BOUNDS, LEUVEN_CENTER, LEUVEN_MAX_ZOOM, LEUVEN_MIN_ZOOM } from "./leuvenMap";
