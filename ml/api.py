@@ -20,13 +20,13 @@ from pydantic import BaseModel, Field, model_validator
 import model_io
 from features import LAT_RANGE, LNG_RANGE, build_features
 
-rf, MODEL_METRICS = model_io.load()
+model, MODEL_METRICS = model_io.load()
 
 MAX_BATCH = 5_000
 
 
 def predict(lats, lngs, times) -> list[float]:
-    scores = np.clip(rf.predict(build_features(lats, lngs, times)), 0.0, 1.0)
+    scores = np.clip(model.predict(build_features(lats, lngs, times)), 0.0, 1.0)
     return [round(float(s), 4) for s in scores]
 
 

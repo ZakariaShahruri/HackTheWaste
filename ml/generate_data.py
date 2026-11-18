@@ -1,100 +1,115 @@
 """
-Generates a synthetic leuven_trash.csv that mirrors the DB schema:
-  (id, latitude, longitude, time, likelihood)
+Generates data/leuven_trash.csv: synthetic (latitude, longitude, time, likelihood)
+samples for training.
 
-Trash likelihood is modelled from real Leuven geography:
-  - Oude Markt bar district: high on Fri/Sat nights
-  - Leuven train station:    moderate throughout day
-  - Bondgenotenlaan:         moderate daytime
-  - KU Leuven campus:        weekday peaks
-  - Stadspark:               lower, rises on weekends
-  - Residential blocks:      baseline low
+There's no real litter data behind this. The likelihood comes from a
+hand-written prior about Leuven: each hotspot has a peak and a pattern for
+when it gets messy, fading out with distance, on top of a low baseline.
+  - nightlife (Oude Markt, Naamsestraat): Thursday to Saturday nights, with
+    the mess lingering until the morning sweep
+  - daytime (station, shopping streets, Ladeuzeplein): shop and office hours
+  - campus: weekdays during term, quiet over the summer break
+  - park: afternoons, mostly at the weekend
+Noise is added so the model has something to learn rather than copy.
 """
+
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
 
-RNG = np.random.default_rng(42)
+from features import HOTSPOTS, LAT_RANGE, LEUVEN_CENTER, LEUVEN_TZ, LNG_RANGE, haversine_km
 
-# (name, lat, lng, base_likelihood, weekend_boost, night_boost, radius_km)
-HOTSPOTS = [
-    ("Oude Markt",       50.8793, 4.7005, 0.70, 0.20, 0.25, 0.15),
-    ("Train station",    50.8820, 4.7163, 0.45, 0.05, 0.05, 0.20),
-    ("Bondgenotenlaan",  50.8790, 4.7020, 0.40, 0.00, 0.00, 0.20),
-    ("KU Leuven campus", 50.8751, 4.6980, 0.35, -0.10, 0.05, 0.30),
-    ("Stadspark",        50.8761, 4.6956, 0.20, 0.10, 0.00, 0.25),
-    ("Naamsestraat",     50.8764, 4.7009, 0.55, 0.15, 0.20, 0.18),
-    ("Diestsestraat",    50.8830, 4.7050, 0.38, 0.05, 0.05, 0.22),
-    ("Ladeuzeplein",     50.8778, 4.7046, 0.50, 0.10, 0.10, 0.15),
-]
+DATA_FILE = Path(__file__).resolve().parent / "data" / "leuven_trash.csv"
 
-LEUVEN_CENTER = (50.8798, 4.7005)
-LAT_SPREAD, LNG_SPREAD = 0.04, 0.06   # ~4 km radius
-
-N_SAMPLES = 8_000
-START = datetime(2025, 1, 1)
-END   = datetime(2026, 5, 1)
-SPAN_SECONDS = int((END - START).total_seconds())
+BASELINE = 0.10
+NOISE = 0.05
+N_SAMPLES = 20_000
+SEED = 42
+START = pd.Timestamp("2025-01-01", tz="UTC")
+END = pd.Timestamp("2026-01-01", tz="UTC")
 
 
-def haversine_km(lat1, lng1, lat2, lng2):
-    R = 6371.0
-    dlat = np.radians(lat2 - lat1)
-    dlng = np.radians(lng2 - lng1)
-    a = np.sin(dlat / 2) ** 2 + np.cos(np.radians(lat1)) * np.cos(np.radians(lat2)) * np.sin(dlng / 2) ** 2
-    return R * 2 * np.arcsin(np.sqrt(a))
+def nightlife(hour, dow, month):
+    # Until the morning sweep, the streets still show the night before.
+    night_of = np.where(hour <= 9, (dow - 1) % 7, dow)
+    big_night = np.where(np.isin(night_of, [3, 4, 5]), 1.0, 0.5)  # Thursday to Saturday
+    out = (hour >= 22) | (hour <= 3)
+    morning_after = (hour >= 4) & (hour <= 9)
+    return np.select([out, morning_after], [big_night, 0.6 * big_night], 0.2)
 
 
-def point_likelihood(lat, lng, hour, dow):
-    is_weekend = dow >= 5
-    is_night   = hour >= 22 or hour <= 3
-    is_day     = 9 <= hour <= 18
+def daytime(hour, dow, month):
+    open_hours = (hour >= 8) & (hour <= 19)
+    return np.where(open_hours, np.where(dow >= 5, 0.7, 1.0), 0.15)
 
-    base = 0.10
-    for _, hlat, hlng, bl, wb, nb, radius in HOTSPOTS:
-        dist = haversine_km(lat, lng, hlat, hlng)
-        if dist < radius:
-            weight = max(0, 1 - dist / radius)
-            contrib = bl
-            if is_weekend:
-                contrib += wb
-            if is_night:
-                contrib += nb
-            if is_day and wb < 0:
-                contrib += wb * 0.5
-            base += contrib * weight
 
-    base += RNG.normal(0, 0.05)
-    return float(np.clip(base, 0.0, 1.0))
+def campus(hour, dow, month):
+    lectures = (dow < 5) & (hour >= 9) & (hour <= 18)
+    summer_break = np.isin(month, [7, 8])
+    return np.where(lectures, 1.0, 0.15) * np.where(summer_break, 0.4, 1.0)
+
+
+def park(hour, dow, month):
+    afternoon = (hour >= 12) & (hour <= 20)
+    return np.where(afternoon, np.where(dow >= 5, 1.0, 0.5), 0.1)
+
+
+# Per hotspot: (peak likelihood, radius in km, when it's busy).
+PRIOR = {
+    "oude_markt":      (0.85, 0.25, nightlife),
+    "naamsestraat":    (0.60, 0.30, nightlife),
+    "station":         (0.55, 0.30, daytime),
+    "ladeuzeplein":    (0.50, 0.20, daytime),
+    "bondgenotenlaan": (0.45, 0.30, daytime),
+    "diestsestraat":   (0.40, 0.30, daytime),
+    "ku_leuven":       (0.45, 0.35, campus),
+    "stadspark":       (0.35, 0.25, park),
+}
+
+
+def prior_likelihood(lats, lngs, local_times: pd.DatetimeIndex) -> np.ndarray:
+    hour = local_times.hour.to_numpy()
+    dow = local_times.day_of_week.to_numpy()
+    month = local_times.month.to_numpy()
+
+    likelihood = np.full(len(lats), BASELINE)
+    for name, (peak, radius_km, pattern) in PRIOR.items():
+        nearness = np.clip(1 - haversine_km(lats, lngs, *HOTSPOTS[name]) / radius_km, 0, None)
+        likelihood += peak * pattern(hour, dow, month) * nearness
+    return likelihood
+
+
+def sample_points(n: int, rng: np.random.Generator):
+    """Most samples close to the hotspots, where the prior changes fastest; the rest anywhere in town."""
+    near = int(n * 0.6)
+    centres = np.array(list(HOTSPOTS.values()))[rng.integers(0, len(HOTSPOTS), near)]
+    lats = np.concatenate([centres[:, 0] + rng.normal(0, 0.0012, near),
+                           rng.normal(LEUVEN_CENTER[0], 0.013, n - near)])
+    lngs = np.concatenate([centres[:, 1] + rng.normal(0, 0.0018, near),
+                           rng.normal(LEUVEN_CENTER[1], 0.020, n - near)])
+    return np.clip(lats, *LAT_RANGE), np.clip(lngs, *LNG_RANGE)
+
+
+def generate(n: int, rng: np.random.Generator) -> pd.DataFrame:
+    lats, lngs = sample_points(n, rng)
+    span = int((END - START).total_seconds())
+    times = (START + pd.to_timedelta(rng.integers(0, span, n), unit="s")).tz_convert(LEUVEN_TZ)
+
+    likelihood = prior_likelihood(lats, lngs, times) + rng.normal(0, NOISE, n)
+    return pd.DataFrame({
+        "latitude": lats.round(6),
+        "longitude": lngs.round(6),
+        "time": times.strftime("%Y-%m-%dT%H:%M:%S%:z"),
+        "likelihood": np.clip(likelihood, 0.0, 1.0).round(4),
+    })
 
 
 def main():
-    lats = RNG.normal(LEUVEN_CENTER[0], LAT_SPREAD / 3, N_SAMPLES)
-    lngs = RNG.normal(LEUVEN_CENTER[1], LNG_SPREAD / 3, N_SAMPLES)
-    lats = np.clip(lats, LEUVEN_CENTER[0] - LAT_SPREAD, LEUVEN_CENTER[0] + LAT_SPREAD)
-    lngs = np.clip(lngs, LEUVEN_CENTER[1] - LNG_SPREAD, LEUVEN_CENTER[1] + LNG_SPREAD)
-
-    offsets = RNG.integers(0, SPAN_SECONDS, N_SAMPLES)
-    timestamps = [START + timedelta(seconds=int(s)) for s in offsets]
-
-    rows = []
-    for i, (lat, lng, ts) in enumerate(zip(lats, lngs, timestamps)):
-        hour = ts.hour
-        dow  = ts.weekday()
-        likelihood = point_likelihood(lat, lng, hour, dow)
-        rows.append({
-            "id": i + 1,
-            "latitude":  round(lat, 6),
-            "longitude": round(lng, 6),
-            "time":      ts.strftime("%Y-%m-%dT%H:%M:%S"),
-            "likelihood": round(likelihood, 4),
-        })
-
-    df = pd.DataFrame(rows)
-    out = "data/leuven_trash.csv"
-    df.to_csv(out, index=False)
-    print(f"Wrote {len(df)} rows → {out}")
+    df = generate(N_SAMPLES, np.random.default_rng(SEED))
+    DATA_FILE.parent.mkdir(exist_ok=True)
+    df.to_csv(DATA_FILE, index=False)
+    print(f"Wrote {len(df)} rows → {DATA_FILE}")
     print(df.describe())
 
 

@@ -63,9 +63,11 @@ flowchart LR
    on rewards in the marketplace; each redemption returns a voucher code.
    Stock and balance are taken with conditional updates, so two people can't
    both get the last item and one balance can't be spent twice.
-6. **Predict.** A small scikit-learn model estimates how likely litter is across
-   Leuven for any weekday and hour. The backend proxies it; browsers never call
-   the ML service directly.
+6. **Predict.** A small scikit-learn model (gradient-boosted trees) estimates how
+   likely litter is across Leuven for any weekday and hour: the Oude Markt on a
+   Thursday night and the morning after, the station during the day, the campus
+   during term. The backend proxies it; browsers never call the ML service
+   directly.
 
 ## WhatsApp commands
 
@@ -129,8 +131,10 @@ cd backend && mvn spring-boot:run
 cd frontend && npm install && npm run dev
 
 # ML service → http://localhost:8000 (only needed for the predictive heatmap)
-cd ml && python -m venv venv && venv/bin/pip install -r requirements.txt
+cd ml && python3.13 -m venv venv && venv/bin/pip install -r requirements.txt
 venv/bin/uvicorn api:app --port 8000
+# optional: regenerate the training data and retrain (deterministic)
+venv/bin/python generate_data.py && venv/bin/python train.py
 ```
 
 If port 8080 is taken, run the backend with `--server.port=8099` and the
@@ -202,8 +206,9 @@ running. GitHub Actions runs all three suites on every push.
 ## Limitations
 
 - **The ML model is trained on synthetic data**, generated from a hand-written
-  prior about when and where Leuven gets messy (nightlife, markets, student
-  areas). It shows the pipeline, not real-world accuracy.
+  prior about when and where Leuven gets messy (nightlife, shopping streets,
+  campus term time, parks; see `ml/generate_data.py`). Its R² is measured
+  against that same prior, so it shows the pipeline, not real-world accuracy.
 - **The demo resets nightly.** Anything reported on the live demo is gone the
   next morning (see above).
 - **Demo photos are drawn, not taken.** The seeded feed shows illustrated

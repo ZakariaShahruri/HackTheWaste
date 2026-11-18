@@ -88,7 +88,7 @@ export default function ProfessionalDashboard() {
         <div className="card-header">
           <div>
             <div className="card-title">
-              {mapMode === "live" ? "Live hotspot map" : "Predictive heatmap · Random Forest ML"}
+              {mapMode === "live" ? "Live hotspot map" : "Predictive heatmap · ML forecast"}
             </div>
             <h3 style={{ fontSize: 18, marginTop: 4 }}>
               {mapMode === "live"

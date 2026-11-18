@@ -13,15 +13,16 @@ LEUVEN_CENTER = (50.8798, 4.7005)
 LAT_RANGE = (50.85, 50.91)
 LNG_RANGE = (4.66, 4.75)
 
+# The same spots the backend's demo city uses, so the heatmap lines up with it.
 HOTSPOTS = {
-    "oude_markt":      (50.8793, 4.7005),
-    "station":         (50.8820, 4.7163),
-    "bondgenotenlaan": (50.8790, 4.7020),
-    "ku_leuven":       (50.8751, 4.6980),
-    "stadspark":       (50.8761, 4.6956),
-    "naamsestraat":    (50.8764, 4.7009),
-    "diestsestraat":   (50.8830, 4.7050),
-    "ladeuzeplein":    (50.8778, 4.7046),
+    "oude_markt":      (50.8785, 4.7000),
+    "station":         (50.8812, 4.7150),
+    "bondgenotenlaan": (50.8803, 4.7090),
+    "ku_leuven":       (50.8775, 4.7019),  # Hogeschoolplein
+    "stadspark":       (50.8757, 4.7023),  # Sint-Donatuspark
+    "naamsestraat":    (50.8752, 4.7008),
+    "diestsestraat":   (50.8830, 4.7090),
+    "ladeuzeplein":    (50.8777, 4.7040),
 }
 
 FEATURE_NAMES = (
@@ -55,7 +56,7 @@ def build_features(lats, lngs, times) -> np.ndarray:
     lngs = np.asarray(lngs, dtype=float)
     times = leuven_times(times)
     hour = times.hour.to_numpy()
-    dow = times.dayofweek.to_numpy()  # 0 = Monday
+    dow = times.day_of_week.to_numpy()  # 0 = Monday
 
     columns = [
         lats,
