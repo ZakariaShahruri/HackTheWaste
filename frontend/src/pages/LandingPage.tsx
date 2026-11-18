@@ -1,11 +1,8 @@
-import { useState } from "react";
 import { Link } from "react-router";
 import { useApi } from "../hooks/useApi";
 import { api } from "../api/client";
-import { ScoreChip } from "../components/ScoreChip";
+import { PhotoCard } from "../components/PhotoCard";
 import { WhatsAppReportCTA } from "../components/WhatsAppReportCTA";
-import type { FeedItemDto } from "../api/types";
-import { assetUrl } from "../api/http";
 
 export default function LandingPage() {
   const POLL = { pollMs: 10000 };
@@ -108,81 +105,13 @@ export default function LandingPage() {
         ) : (
           <div className="feed-grid">
             {feedPhotos.map((p) => (
-              <LandingPhotoCard key={p.id} photo={p} />
+              <PhotoCard key={p.id} photo={p} />
             ))}
           </div>
         )}
       </section>
     </div>
   );
-}
-
-function LandingPhotoCard({ photo: p }: { photo: FeedItemDto }) {
-  const [imgError, setImgError] = useState(false);
-
-  return (
-    <div className="feed-card">
-      {p.photoUrl && !imgError ? (
-        <img
-          src={assetUrl(p.photoUrl)}
-          alt={`Trash report at ${p.segmentName ?? "Leuven"}`}
-          className="feed-photo"
-          onError={() => setImgError(true)}
-          loading="lazy"
-        />
-      ) : (
-        <div className="feed-placeholder">🗑</div>
-      )}
-
-      <div className="feed-meta">
-        <div className="spread" style={{ alignItems: "flex-start" }}>
-          <div style={{ minWidth: 0 }}>
-            {p.facultyShortCode && (
-              <span
-                className="feed-clan"
-                style={{ background: p.facultyColor ?? "#e5e7eb", color: "white" }}
-              >
-                {p.facultyEmoji} {p.facultyShortCode}
-              </span>
-            )}
-            <div className="feed-username">{p.username}</div>
-            {p.segmentName && (
-              <div style={{ fontSize: 12, color: "var(--fg-soft)", marginTop: 2 }}>
-                📍 {p.segmentName}
-              </div>
-            )}
-          </div>
-          {p.cleanlinessScore != null ? (
-            <ScoreChip score={p.cleanlinessScore} />
-          ) : (
-            <span style={{ fontSize: 10, color: "var(--fg-soft)", border: "1px dashed var(--border)", borderRadius: 6, padding: "2px 6px" }}>
-              AI pending
-            </span>
-          )}
-        </div>
-        {p.tags && (
-          <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 4 }}>
-            {p.tags.split(",").map((t) => (
-              <span key={t} className="feed-tag">#{t.trim()}</span>
-            ))}
-          </div>
-        )}
-        <div style={{ marginTop: 8, fontSize: 11, color: "var(--fg-soft)" }}>
-          {timeAgo(p.reportedAt)}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
 }
 
 function Stat({

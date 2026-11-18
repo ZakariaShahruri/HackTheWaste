@@ -969,6 +969,7 @@ textarea {
   padding: 2px 8px;
   border-radius: 999px;
   letter-spacing: 0.04em;
+  color: white;
 }
 
 .feed-username {
@@ -987,6 +988,50 @@ textarea {
   padding: 2px 7px;
   border-radius: 999px;
   font-weight: 500;
+}
+
+.feed-heading {
+  align-items: flex-start;
+}
+
+.feed-who {
+  min-width: 0;
+}
+
+.feed-location,
+.feed-time {
+  display: block;
+  font-size: 12px;
+  color: var(--fg-soft);
+  margin-top: 2px;
+}
+
+.feed-time {
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.feed-pending {
+  font-size: 10px;
+  color: var(--fg-soft);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  white-space: nowrap;
+}
+
+.feed-description {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--fg);
+}
+
+.feed-tags {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 /* topbar auth area */
