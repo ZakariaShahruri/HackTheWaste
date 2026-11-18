@@ -6,6 +6,7 @@ import { HotspotMap } from "../components/Map/HotspotMap";
 import { PredictiveMap } from "../components/Map/PredictiveMap";
 import { Sparkbar } from "../components/Sparkbar";
 import { ScoreChip } from "../components/ScoreChip";
+import { byNeed } from "../lib/scores";
 import { StatusTag } from "../components/StatusTag";
 import { AsyncContent } from "../components/AsyncContent";
 import { EmptyState } from "../components/States";
@@ -141,14 +142,14 @@ export default function ProfessionalDashboard() {
                 <tbody>
                   {list
                     .filter((s) => district === "ALL" || s.district === district)
-                    .sort((a, b) => a.aiCleanlinessScore - b.aiCleanlinessScore)
+                    .sort(byNeed)
                     .map((s) => (
                       <tr key={s.id}>
                         <td><strong>{s.name}</strong></td>
                         <td className="muted">{s.district ?? "—"}</td>
                         <td>{s.recentReportCount ?? 0}</td>
                         <td><FacultySwatch name={s.facultyName} color={s.facultyColor} /></td>
-                        <td><ScoreChip score={s.aiCleanlinessScore ?? 0} /></td>
+                        <td><ScoreChip score={s.aiCleanlinessScore} /></td>
                       </tr>
                     ))}
                 </tbody>

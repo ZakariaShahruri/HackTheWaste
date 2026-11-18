@@ -5,6 +5,7 @@ import type { LeaderboardEntry } from "../api/types";
 import { useApi } from "../hooks/useApi";
 import { StudentMap } from "../components/Map/StudentMap";
 import { ScoreChip } from "../components/ScoreChip";
+import { byNeed, cleanest } from "../lib/scores";
 import { AsyncContent } from "../components/AsyncContent";
 import { EmptyState } from "../components/States";
 import { FacultySwatch } from "../components/FacultySwatch";
@@ -72,7 +73,7 @@ export default function StudentDashboard() {
           />
           <Stat
             label="Cleanest street"
-            value={[...(segments.data ?? [])].sort((a, b) => b.aiCleanlinessScore - a.aiCleanlinessScore)[0]?.name ?? "—"}
+            value={cleanest(segments.data ?? [])?.name ?? "—"}
             sub="goals for everyone"
           />
         </div>
@@ -144,7 +145,7 @@ export default function StudentDashboard() {
                 </thead>
                 <tbody>
                   {[...list]
-                    .sort((a, b) => a.aiCleanlinessScore - b.aiCleanlinessScore)
+                    .sort(byNeed)
                     .slice(0, 6)
                     .map((s) => (
                       <tr key={s.id}>
@@ -154,7 +155,7 @@ export default function StudentDashboard() {
                         </td>
                         <td><FacultySwatch name={s.facultyName} color={s.facultyColor} /></td>
                         <td>{s.recentReportCount}</td>
-                        <td><ScoreChip score={s.aiCleanlinessScore ?? 0} /></td>
+                        <td><ScoreChip score={s.aiCleanlinessScore} /></td>
                       </tr>
                     ))}
                 </tbody>

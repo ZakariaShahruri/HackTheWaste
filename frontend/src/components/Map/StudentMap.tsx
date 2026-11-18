@@ -20,6 +20,7 @@ import type {
   StreetSegmentDto,
 } from "../../api/types";
 import { BaseTiles } from "./BaseTiles";
+import { SCORE_BANDS, UNSCORED_COLOR, scoreColor } from "../../lib/scores";
 
 interface Props {
   faculties: FacultyDto[];
@@ -42,13 +43,6 @@ function polygonToLatLng(geo: string): [number, number][] | null {
   } catch {
     return null;
   }
-}
-
-function scoreColor(score: number): string {
-  if (score >= 80) return "#16a34a";
-  if (score >= 60) return "#f59e0b";
-  if (score >= 40) return "#f97316";
-  return "#dc2626";
 }
 
 export function StudentMap({
@@ -125,7 +119,7 @@ export function StudentMap({
             <Popup>
               <strong>{s.name}</strong>
               <br />
-              Score: {s.aiCleanlinessScore?.toFixed(1)} / 100
+              Score: {s.aiCleanlinessScore === null ? "not scored yet" : `${s.aiCleanlinessScore.toFixed(1)} / 100`}
               <br />
               Held by: {s.facultyName ?? "—"}
               <br />
@@ -161,21 +155,15 @@ export function StudentMap({
       </MapContainer>
       <div className="legend">
         <div style={{ fontWeight: 600, marginBottom: 4 }}>Cleanliness</div>
+        {SCORE_BANDS.map((band) => (
+          <div key={band.min} className="legend-row">
+            <div className="legend-swatch" style={{ background: band.color }} />
+            {band.label}
+          </div>
+        ))}
         <div className="legend-row">
-          <div className="legend-swatch" style={{ background: "#16a34a" }} />
-          80–100 sparkling
-        </div>
-        <div className="legend-row">
-          <div className="legend-swatch" style={{ background: "#f59e0b" }} />
-          60–80 ok
-        </div>
-        <div className="legend-row">
-          <div className="legend-swatch" style={{ background: "#f97316" }} />
-          40–60 grimey
-        </div>
-        <div className="legend-row">
-          <div className="legend-swatch" style={{ background: "#dc2626" }} />
-          0–40 needs love
+          <div className="legend-swatch" style={{ background: UNSCORED_COLOR }} />
+          not scored yet
         </div>
       </div>
     </div>

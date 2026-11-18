@@ -18,7 +18,8 @@ export interface StreetSegmentDto {
   district?: string;
   lat: number;
   lng: number;
-  aiCleanlinessScore: number;
+  /** 0–100, 100 = clean; null until the street has been scored. */
+  aiCleanlinessScore: number | null;
   recentReportCount: number;
   facultyShortCode?: string;
   facultyName?: string;

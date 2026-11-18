@@ -1,16 +1,16 @@
-export function ScoreChip({ score }: { score: number }) {
-  const v = score ?? 0;
-  const bg =
-    v >= 80
-      ? "#16a34a"
-      : v >= 60
-        ? "#f59e0b"
-        : v >= 40
-          ? "#f97316"
-          : "#dc2626";
+import { scoreColor } from "../lib/scores";
+
+export function ScoreChip({ score }: { score: number | null }) {
+  if (score === null) {
+    return (
+      <span className="score-chip" style={{ background: scoreColor(null) }} title="Not scored yet">
+        —
+      </span>
+    );
+  }
   return (
-    <span className="score-chip" style={{ background: bg }}>
-      {v.toFixed(0)}
+    <span className="score-chip" style={{ background: scoreColor(score) }}>
+      {score.toFixed(0)}
     </span>
   );
 }
