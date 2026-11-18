@@ -20,6 +20,11 @@ backend/.mvn
 infra/postgresql.bicepparam
 infra/main.bicepparam
 
-# local secrets — never commit
+# local secrets
 .env
 backend/src/main/resources/application-local.yml
+
+# ---
+
+TODO.md
+*.tsbuildinfo
