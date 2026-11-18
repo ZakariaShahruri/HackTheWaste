@@ -24,10 +24,6 @@ public class TrashPhoto {
     @Column(length = 100)
     private String username;
 
-    /** Nullable — only present for registered web users. Never shown publicly. */
-    @Column(length = 255)
-    private String email;
-
     @Column(length = 10)
     private String facultyShortCode;
 
@@ -63,8 +59,6 @@ public class TrashPhoto {
     public void setId(Long id) { this.id = id; }
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
-    public String getEmail() { return email; }
-    public void setEmail(String email) { this.email = email; }
     public String getFacultyShortCode() { return facultyShortCode; }
     public void setFacultyShortCode(String facultyShortCode) { this.facultyShortCode = facultyShortCode; }
     public String getFacultyEmoji() { return facultyEmoji; }

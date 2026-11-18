@@ -94,7 +94,6 @@ export interface StatsDto {
 export interface TrashPhotoDto {
   id: number;
   username: string;
-  email?: string;
   facultyShortCode?: string;
   facultyEmoji?: string;
   facultyColor?: string;

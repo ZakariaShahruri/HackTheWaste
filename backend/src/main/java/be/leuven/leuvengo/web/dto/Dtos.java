@@ -46,8 +46,9 @@ public final class Dtos {
     /** One calendar day (Europe/Brussels): ISO date plus a short label. */
     public record TimeBucket(String date, String label, long count) {}
 
+    /** Public feed item: no personal data, coordinates rounded to roughly 10 m. */
     public record TrashPhotoDto(
-            Long id, String username, String email,
+            Long id, String username,
             String facultyShortCode, String facultyEmoji, String facultyColor,
             String photoUrl, Double lat, Double lng, String segmentName,
             Integer cleanlinessScore, Integer userRating, String tags,
@@ -98,11 +99,18 @@ public final class Dtos {
                 r.getCostPoints(), r.getStock());
     }
 
+    private static final String ANONYMOUS = "Anonymous Leuvenaar";
+
+    /** 4 decimals is about 11 m north-south and 7 m east-west in Leuven. */
+    static Double coarse(Double degrees) {
+        return degrees == null ? null : Math.round(degrees * 10_000) / 10_000.0;
+    }
+
     public static TrashPhotoDto of(TrashPhoto p) {
         return new TrashPhotoDto(
-                p.getId(), p.getUsername(), p.getEmail(),
+                p.getId(), p.getUsername() != null ? p.getUsername() : ANONYMOUS,
                 p.getFacultyShortCode(), p.getFacultyEmoji(), p.getFacultyColor(),
-                p.getPhotoUrl(), p.getLat(), p.getLng(), p.getSegmentName(),
+                p.getPhotoUrl(), coarse(p.getLat()), coarse(p.getLng()), p.getSegmentName(),
                 p.getCleanlinessScore(), p.getUserRating(), p.getTags(),
                 p.getReportedAt());
     }
