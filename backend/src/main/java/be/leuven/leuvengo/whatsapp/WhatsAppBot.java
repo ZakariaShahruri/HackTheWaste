@@ -4,9 +4,10 @@ import be.leuven.leuvengo.domain.CleanlinessScale;
 import be.leuven.leuvengo.domain.Faculty;
 import be.leuven.leuvengo.domain.TrashPhoto;
 import be.leuven.leuvengo.net.SafeHttpFetcher;
+import be.leuven.leuvengo.photo.ImageNormalizer;
+import be.leuven.leuvengo.photo.PhotoStorage;
 import be.leuven.leuvengo.repository.TrashPhotoRepository;
 import be.leuven.leuvengo.security.Pseudonyms;
-import be.leuven.leuvengo.service.BlobStorageService;
 import be.leuven.leuvengo.service.GeminiService;
 import be.leuven.leuvengo.service.ReportService;
 import org.slf4j.Logger;
@@ -52,26 +53,28 @@ public class WhatsAppBot {
             + "then send the photo again.";
     static final String ASK_FOR_PHOTO = "Got it! 📍 Now please send a photo of the litter "
             + "so our AI can assess it.";
-    static final String BAD_MEDIA = "We couldn't open that photo. Please send it again as a normal photo (JPEG or PNG).";
+    static final String BAD_MEDIA = "We couldn't open that photo. Please send it again as a normal photo.";
 
     private final WhatsAppSessions sessions;
     private final Pseudonyms pseudonyms;
     private final TwilioMediaFetcher media;
     private final GeminiService gemini;
-    private final BlobStorageService blobStorage;
+    private final ImageNormalizer images;
+    private final PhotoStorage storage;
     private final ReportService reports;
     private final TrashPhotoRepository photos;
     private final ClanMembership clans;
     private final Clock clock;
 
     public WhatsAppBot(WhatsAppSessions sessions, Pseudonyms pseudonyms, TwilioMediaFetcher media,
-                       GeminiService gemini, BlobStorageService blobStorage, ReportService reports,
+                       ImageNormalizer images, GeminiService gemini, PhotoStorage storage, ReportService reports,
                        TrashPhotoRepository photos, ClanMembership clans, Clock clock) {
         this.sessions = sessions;
         this.pseudonyms = pseudonyms;
         this.media = media;
         this.gemini = gemini;
-        this.blobStorage = blobStorage;
+        this.images = images;
+        this.storage = storage;
         this.reports = reports;
         this.photos = photos;
         this.clans = clans;
@@ -127,10 +130,10 @@ public class WhatsAppBot {
             return NEED_LOCATION;
         }
 
-        SafeHttpFetcher.Download photo;
+        ImageNormalizer.Normalized photo;
         try {
-            photo = media.fetch(mediaUrl);
-        } catch (SafeHttpFetcher.FetchException e) {
+            photo = images.normalize(media.fetch(mediaUrl).bytes());
+        } catch (SafeHttpFetcher.FetchException | ImageNormalizer.UnreadableImageException e) {
             log.warn("Refused WhatsApp media from {}: {}", publicId, e.getMessage());
             return BAD_MEDIA;
         }
@@ -141,7 +144,7 @@ public class WhatsAppBot {
             return rejection(ai.fakeReason());
         }
 
-        String photoUrl = blobStorage.upload(photo.bytes(), photo.contentType(), publicId).orElse(null);
+        String photoUrl = storage.store(photo, publicId);
         file(location.get(), ai, photoUrl, publicId, clans.clanOf(senderKey).orElse(null));
         sessions.finish(senderKey);
         return verdict(ai);
@@ -154,23 +157,21 @@ public class WhatsAppBot {
                 at.lat(), at.lng(), ai.score(), "WhatsApp report", photoUrl, tags,
                 clan == null ? null : clan.getShortCode(), publicId));
 
-        if (photoUrl != null) {
-            TrashPhoto feedItem = new TrashPhoto();
-            feedItem.setUsername("WhatsApp user");
-            feedItem.setPhotoUrl(photoUrl);
-            feedItem.setLat(at.lat());
-            feedItem.setLng(at.lng());
-            feedItem.setCleanlinessScore(ai.score());
-            feedItem.setUserRating(CleanlinessScale.toRating(ai.score()));
-            feedItem.setTags(tags);
-            if (clan != null) {
-                feedItem.setFacultyShortCode(clan.getShortCode());
-                feedItem.setFacultyEmoji(clan.getEmoji());
-                feedItem.setFacultyColor(clan.getColor());
-            }
-            feedItem.setReportedAt(clock.instant());
-            photos.save(feedItem);
+        TrashPhoto feedItem = new TrashPhoto();
+        feedItem.setUsername("WhatsApp user");
+        feedItem.setPhotoUrl(photoUrl);
+        feedItem.setLat(at.lat());
+        feedItem.setLng(at.lng());
+        feedItem.setCleanlinessScore(ai.score());
+        feedItem.setUserRating(CleanlinessScale.toRating(ai.score()));
+        feedItem.setTags(tags);
+        if (clan != null) {
+            feedItem.setFacultyShortCode(clan.getShortCode());
+            feedItem.setFacultyEmoji(clan.getEmoji());
+            feedItem.setFacultyColor(clan.getColor());
         }
+        feedItem.setReportedAt(clock.instant());
+        photos.save(feedItem);
     }
 
     private static String rejection(String reason) {

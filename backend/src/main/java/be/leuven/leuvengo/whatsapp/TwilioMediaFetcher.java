@@ -14,8 +14,8 @@ import java.util.Set;
 @Component
 public class TwilioMediaFetcher {
 
-    /** Image types Gemini accepts. */
-    static final Set<String> IMAGE_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif");
+    /** Formats {@link be.leuven.leuvengo.photo.ImageNormalizer} can decode. WhatsApp sends photos as JPEG. */
+    static final Set<String> IMAGE_TYPES = Set.of("image/jpeg", "image/png");
     static final long MAX_BYTES = 8L * 1024 * 1024;
 
     private final SafeHttpFetcher fetcher;

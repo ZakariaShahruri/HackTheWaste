@@ -5,6 +5,9 @@ import be.leuven.leuvengo.net.SafeHttpFetcher;
 import be.leuven.leuvengo.repository.FacultyRepository;
 import be.leuven.leuvengo.repository.PendingReportRepository;
 import be.leuven.leuvengo.repository.ReportRepository;
+import be.leuven.leuvengo.repository.TrashPhotoRepository;
+import be.leuven.leuvengo.domain.TrashPhoto;
+import be.leuven.leuvengo.support.TestImages;
 import be.leuven.leuvengo.security.Pseudonyms;
 import be.leuven.leuvengo.service.GeminiService;
 import be.leuven.leuvengo.service.PointsPolicy;
@@ -38,6 +41,7 @@ class WhatsAppBotIT {
     @Autowired ReportRepository reports;
     @Autowired Pseudonyms pseudonyms;
     @Autowired FacultyRepository faculties;
+    @Autowired TrashPhotoRepository feed;
     @MockitoBean GeminiService gemini;
     @MockitoBean TwilioMediaFetcher media;
 
@@ -46,7 +50,7 @@ class WhatsAppBotIT {
     @BeforeEach
     void setUp() throws Exception {
         reportsBefore = reports.count();
-        when(media.fetch(anyString())).thenReturn(new SafeHttpFetcher.Download(new byte[]{1}, "image/jpeg"));
+        when(media.fetch(anyString())).thenReturn(new SafeHttpFetcher.Download(TestImages.jpeg(640, 480), "image/jpeg"));
         when(gemini.scorePhoto(any(), anyString())).thenReturn(
                 GeminiService.ScoreResult.genuine(10, "Overflowing bin", List.of("plastic")));
     }
@@ -62,6 +66,25 @@ class WhatsAppBotIT {
         assertThat(latest.getCleanlinessScore()).isEqualTo(10);
         assertThat(latest.getHotspot().getMeanCleanliness()).isEqualTo(10.0);
         assertThat(pending.count()).isZero();
+    }
+
+    @Test
+    void theFeedGetsTheStoredPhoto() {
+        location(ANA);
+        photo(ANA);
+
+        TrashPhoto feedItem = feed.findAll().stream().max(Comparator.comparing(TrashPhoto::getId)).orElseThrow();
+        assertThat(feedItem.getPhotoUrl()).startsWith("/api/photos/");
+        assertThat(feedItem.getCleanlinessScore()).isEqualTo(10);
+    }
+
+    @Test
+    void aFileThatIsNotReallyAnImageIsRefused() throws Exception {
+        location(ANA);
+        when(media.fetch(anyString())).thenReturn(new SafeHttpFetcher.Download("<svg/>".getBytes(), "image/jpeg"));
+
+        assertThat(photo(ANA)).isEqualTo(WhatsAppBot.BAD_MEDIA);
+        assertThat(reports.count()).isEqualTo(reportsBefore);
     }
 
     @Test

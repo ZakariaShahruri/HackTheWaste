@@ -3,13 +3,7 @@ package be.leuven.leuvengo.domain;
 import jakarta.persistence.*;
 import java.time.Instant;
 
-/**
- * One entry in the public photo feed.
- * Populated by the WhatsApp controller after uploading to Azure Blob Storage,
- * or by the web report flow if a photo was attached.
- *
- * cleanlinessScore is left null until the AI classifier runs (future work).
- */
+/** One entry in the public photo feed, written when a photo report is filed. */
 @Entity
 @Table(name = "trash_photo", indexes = {
         @Index(name = "idx_trash_photo_reported", columnList = "reportedAt")
@@ -33,7 +27,7 @@ public class TrashPhoto {
     @Column(length = 20)
     private String facultyColor;
 
-    /** Azure Blob Storage URL. Null until the photo has been uploaded. */
+    /** Where the photo is served from; see {@link be.leuven.leuvengo.photo.PhotoStorage}. */
     @Column(length = 1024)
     private String photoUrl;
 
@@ -43,7 +37,7 @@ public class TrashPhoto {
     @Column(length = 100)
     private String segmentName;
 
-    /** 0–100 AI cleanliness score. Null until classifier runs. */
+    /** 0-100 AI cleanliness score (100 = clean). */
     private Integer cleanlinessScore;
 
     /** 0–5 rating submitted by the reporter. */
