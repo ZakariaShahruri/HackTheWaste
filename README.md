@@ -144,6 +144,18 @@ venv/bin/python generate_data.py && venv/bin/python train.py
 If port 8080 is taken, run the backend with `--server.port=8099` and the
 frontend with `VITE_PROXY_TARGET=http://localhost:8099 npm run dev`.
 
+To run it the way production does, with Postgres and the prod profile, Docker
+Compose builds and starts the backend, the ML service and the database:
+
+```bash
+docker compose up --build --wait   # backend → http://localhost:8080
+cd frontend && npm run dev
+```
+
+Set `BACKEND_PORT` to publish the backend elsewhere, and `GEMINI_API_KEY` to
+score photos. The data lives in the `db-data` volume; `docker compose down -v`
+starts over.
+
 Without a `GEMINI_API_KEY`, photos still go through the pipeline but get a
 neutral score that is labelled "AI offline, demo score".
 

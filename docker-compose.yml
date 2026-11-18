@@ -1,0 +1,41 @@
+# The backend, ML service and Postgres, configured like production.
+# The frontend runs on the host: cd frontend && npm run dev
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: leuvengo
+      POSTGRES_USER: leuvengo
+      POSTGRES_PASSWORD: leuvengo
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U leuvengo -d leuvengo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  ml:
+    build: ml
+
+  backend:
+    build: backend
+    depends_on:
+      db:
+        condition: service_healthy
+      ml:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/leuvengo
+      SPRING_DATASOURCE_USERNAME: leuvengo
+      SPRING_DATASOURCE_PASSWORD: leuvengo
+      ALLOWED_ORIGINS: http://localhost:5173
+      PSEUDONYM_SECRET: local-compose-only
+      ML_API_URL: http://ml:8000
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+
+volumes:
+  db-data:
