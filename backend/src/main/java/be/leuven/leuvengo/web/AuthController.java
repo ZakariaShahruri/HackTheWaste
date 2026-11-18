@@ -38,10 +38,12 @@ public class AuthController {
             @NotBlank @Size(max = 72) String password) {}
 
     /** {@code token} is only present right after register/login. */
-    public record AuthResponse(Long id, String email, String facultyShortCode, Role role, String token) {
+    public record AuthResponse(Long id, String email, String facultyShortCode, Role role, int points,
+                               String token) {
 
         static AuthResponse of(AppUser u, String token) {
-            return new AuthResponse(u.getId(), u.getEmail(), u.getFacultyShortCode(), u.getRole(), token);
+            return new AuthResponse(u.getId(), u.getEmail(), u.getFacultyShortCode(), u.getRole(),
+                    u.getPoints(), token);
         }
     }
 

@@ -10,6 +10,7 @@ import be.leuven.leuvengo.service.LeuvenArea;
 import be.leuven.leuvengo.service.ReportIngestionService;
 import be.leuven.leuvengo.service.ReportIngestionService.Filed;
 import be.leuven.leuvengo.service.ReportIngestionService.Rejected;
+import be.leuven.leuvengo.service.Reporter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -119,7 +120,8 @@ public class WhatsAppBot {
         ReportIngestionService.Outcome outcome;
         try {
             outcome = ingestion.ingest(new ReportIngestionService.PhotoReport(
-                    location.get().lat(), location.get().lng(), image, Report.Source.WHATSAPP, publicId, clan));
+                    location.get().lat(), location.get().lng(), image, Report.Source.WHATSAPP,
+                    Reporter.anonymous(publicId, clan)));
         } catch (RuntimeException e) {
             log.error("Could not file WhatsApp report from {}", publicId, e);
             return SERVER_ERROR;

@@ -2,6 +2,7 @@ package be.leuven.leuvengo.web;
 
 import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.service.ReportService;
+import be.leuven.leuvengo.service.Reporter;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,7 +30,7 @@ class FeedPrivacyIT {
     @Test
     void theFeedShowsPhotoReportsWithoutPersonalDataAndOnlyApproximateLocations() throws Exception {
         reports.submit(new ReportService.Submission(50.8765432, 4.7012345, 30, Report.Source.WHATSAPP,
-                "wa-0123456789ab", "EKO",
+                Reporter.anonymous("wa-0123456789ab", "EKO"),
                 new ReportService.Evidence("/api/photos/x", List.of("plastic"), "Overflowing bin", null)));
 
         mvc.perform(get("/api/feed").param("size", "1"))
@@ -47,7 +48,7 @@ class FeedPrivacyIT {
     @Test
     void reportsWithoutAPhotoStayOffTheFeed() throws Exception {
         reports.submit(new ReportService.Submission(50.8765, 4.7012, 30, Report.Source.WEB,
-                "no-photo", null, ReportService.Evidence.NONE));
+                Reporter.anonymous("no-photo", null), ReportService.Evidence.NONE));
 
         mvc.perform(get("/api/feed").param("size", "48"))
                 .andExpect(status().isOk())
@@ -57,7 +58,7 @@ class FeedPrivacyIT {
     @Test
     void theClanFilterOnlyShowsThatClan() throws Exception {
         reports.submit(new ReportService.Submission(50.8765, 4.7012, 30, Report.Source.WHATSAPP,
-                "x", "APO", new ReportService.Evidence("/api/photos/y", List.of(), null, null)));
+                Reporter.anonymous("x", "APO"), new ReportService.Evidence("/api/photos/y", List.of(), null, null)));
 
         mvc.perform(get("/api/feed").param("clan", "PSY"))
                 .andExpect(status().isOk())

@@ -77,13 +77,13 @@ class ReportPipelineIT {
 
     private Report submit(int score) {
         return reportService.submit(new ReportService.Submission(
-                LAT, LNG, score, Report.Source.WEB, "test-reporter", "FAR", ReportService.Evidence.NONE));
+                LAT, LNG, score, Report.Source.WEB, Reporter.anonymous("test-reporter", "FAR"), ReportService.Evidence.NONE));
     }
 
     @Test
     void reportsOutsideLeuvenAreRefused() {
         assertThatThrownBy(() -> reportService.submit(new ReportService.Submission(
-                51.2194, 4.4025, 50, Report.Source.WEB, "antwerp", null, ReportService.Evidence.NONE)))
+                51.2194, 4.4025, 50, Report.Source.WEB, Reporter.anonymous("antwerp", null), ReportService.Evidence.NONE)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("outside Leuven");
     }

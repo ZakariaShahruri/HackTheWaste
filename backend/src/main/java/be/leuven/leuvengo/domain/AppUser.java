@@ -1,6 +1,7 @@
 package be.leuven.leuvengo.domain;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
 
@@ -35,6 +36,11 @@ public class AppUser {
 
     private Instant sessionExpiresAt;
 
+    /** Personal points: earned by their own reports, spent on rewards. */
+    @Column(nullable = false)
+    @ColumnDefault("0")
+    private int points;
+
     /** Whether the user gave explicit data-use consent at signup. */
     @Column(nullable = false)
     private boolean consentGiven = false;
@@ -59,6 +65,8 @@ public class AppUser {
     public void setSessionTokenHash(String sessionTokenHash) { this.sessionTokenHash = sessionTokenHash; }
     public Instant getSessionExpiresAt() { return sessionExpiresAt; }
     public void setSessionExpiresAt(Instant sessionExpiresAt) { this.sessionExpiresAt = sessionExpiresAt; }
+    public int getPoints() { return points; }
+    public void setPoints(int points) { this.points = points; }
     public boolean isConsentGiven() { return consentGiven; }
     public void setConsentGiven(boolean consentGiven) { this.consentGiven = consentGiven; }
     public Instant getConsentGivenAt() { return consentGivenAt; }

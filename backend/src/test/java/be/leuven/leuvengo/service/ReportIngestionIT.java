@@ -103,6 +103,7 @@ class ReportIngestionIT {
     }
 
     private static ReportIngestionService.PhotoReport report(double lat, double lng, byte[] image) {
-        return new ReportIngestionService.PhotoReport(lat, lng, image, Report.Source.WEB, "ingest-test", null);
+        return new ReportIngestionService.PhotoReport(lat, lng, image, Report.Source.WEB,
+                Reporter.anonymous("ingest-test", null));
     }
 }

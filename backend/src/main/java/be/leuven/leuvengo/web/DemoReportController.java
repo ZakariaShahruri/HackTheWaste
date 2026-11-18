@@ -10,6 +10,7 @@ import be.leuven.leuvengo.service.GeminiService;
 import be.leuven.leuvengo.service.ReportIngestionService;
 import be.leuven.leuvengo.service.ReportIngestionService.Filed;
 import be.leuven.leuvengo.service.ReportIngestionService.Rejected;
+import be.leuven.leuvengo.service.Reporter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -61,7 +62,7 @@ public class DemoReportController {
             throw badRequest("Please attach a photo");
         }
         var outcome = ingestion.ingest(new ReportIngestionService.PhotoReport(
-                lat, lng, photo.getBytes(), Report.Source.WEB, reporterId(user), clanFor(clan, user)));
+                lat, lng, photo.getBytes(), Report.Source.WEB, reporter(user, clan)));
 
         return switch (outcome) {
             case Filed filed -> result(filed);
@@ -87,11 +88,14 @@ public class DemoReportController {
         return user == null ? null : user.getFacultyShortCode();
     }
 
-    private static String reporterId(AppUser user) {
-        if (user != null) return "user-" + user.getId();
+    /** Logged-in reporters earn points themselves too; anonymous ones get a throwaway id. */
+    private Reporter reporter(AppUser user, String clan) {
+        if (user != null) {
+            return new Reporter("user-" + user.getId(), clanFor(clan, user), user.getId());
+        }
         byte[] random = new byte[6];
         ThreadLocalRandom.current().nextBytes(random);
-        return "web-" + HexFormat.of().formatHex(random);
+        return Reporter.anonymous("web-" + HexFormat.of().formatHex(random), clanFor(clan, null));
     }
 
     private static DemoReportResult result(Filed filed) {

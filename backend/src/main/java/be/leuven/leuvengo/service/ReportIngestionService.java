@@ -18,9 +18,8 @@ public class ReportIngestionService {
 
     private static final Logger log = LoggerFactory.getLogger(ReportIngestionService.class);
 
-    /** A photo report as received. {@code facultyShortCode} may be null. */
-    public record PhotoReport(double lat, double lng, byte[] image, Report.Source source,
-                              String reporterPseudoId, String facultyShortCode) {}
+    /** A photo report as received. */
+    public record PhotoReport(double lat, double lng, byte[] image, Report.Source source, Reporter reporter) {}
 
     public sealed interface Outcome permits Filed, Rejected {}
 
@@ -62,16 +61,15 @@ public class ReportIngestionService {
         // Scored outside the transaction: it's a slow network call.
         GeminiService.ScoreResult verdict = gemini.scorePhoto(photo.bytes(), photo.contentType());
         if (verdict.fake()) {
-            log.info("Rejected a {} photo from {} as not genuine", in.source(), in.reporterPseudoId());
+            log.info("Rejected a {} photo from {} as not genuine", in.source(), in.reporter().pseudoId());
             return new Rejected(Reason.NOT_GENUINE, verdict.fakeReason());
         }
 
         // Photo and report are saved together, so there's never a feed item without a report.
         return transaction.execute(status -> {
-            String photoUrl = storage.store(photo, in.reporterPseudoId());
+            String photoUrl = storage.store(photo, in.reporter().pseudoId());
             Report report = reports.submit(new ReportService.Submission(
-                    in.lat(), in.lng(), verdict.score(), in.source(), in.reporterPseudoId(),
-                    in.facultyShortCode(),
+                    in.lat(), in.lng(), verdict.score(), in.source(), in.reporter(),
                     new ReportService.Evidence(photoUrl, verdict.tags(), verdict.description(), null)));
             return new Filed(report.getId(), report.getHotspot().getId(), photoUrl, verdict);
         });

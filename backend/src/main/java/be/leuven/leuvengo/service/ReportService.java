@@ -4,6 +4,7 @@ import be.leuven.leuvengo.config.LeuvenGoProperties;
 import be.leuven.leuvengo.domain.CleanlinessScale;
 import be.leuven.leuvengo.domain.Hotspot;
 import be.leuven.leuvengo.domain.Report;
+import be.leuven.leuvengo.repository.AppUserRepository;
 import be.leuven.leuvengo.repository.FacultyRepository;
 import be.leuven.leuvengo.repository.ReportRepository;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ public class ReportService {
 
     private final ReportRepository reports;
     private final FacultyRepository faculties;
+    private final AppUserRepository users;
     private final TrafficService traffic;
     private final ScoringService scoring;
     private final PlanonService planon;
@@ -25,24 +27,23 @@ public class ReportService {
 
     public ReportService(ReportRepository reports,
                          FacultyRepository faculties,
+                         AppUserRepository users,
                          TrafficService traffic,
                          ScoringService scoring,
                          PlanonService planon,
                          LeuvenGoProperties props) {
         this.reports = reports;
         this.faculties = faculties;
+        this.users = users;
         this.traffic = traffic;
         this.scoring = scoring;
         this.planon = planon;
         this.props = props;
     }
 
-    /**
-     * A report entering the pipeline. {@code cleanlinessScore} is 0-100 (100 = clean);
-     * {@code facultyShortCode} is the clan to credit, if any.
-     */
+    /** A report entering the pipeline. {@code cleanlinessScore} is 0-100 (100 = clean). */
     public record Submission(double lat, double lng, int cleanlinessScore, Report.Source source,
-                             String reporterPseudoId, String facultyShortCode, Evidence evidence) {}
+                             Reporter reporter, Evidence evidence) {}
 
     /** What backs a report up. Everything is optional. */
     public record Evidence(String photoUrl, List<String> tags, String description, String note) {
@@ -70,16 +71,20 @@ public class ReportService {
         r.setSignalTags(evidence.tags() == null || evidence.tags().isEmpty()
                 ? null : truncate(String.join(",", evidence.tags()), 200));
         r.setReportedAt(Instant.now());
-        r.setReporterPseudoId(s.reporterPseudoId() != null ? s.reporterPseudoId()
+        Reporter who = s.reporter();
+        r.setReporterPseudoId(who.pseudoId() != null ? who.pseudoId()
                 : "anon-" + UUID.randomUUID().toString().substring(0, 8));
 
-        if (s.facultyShortCode() != null) {
-            faculties.findByShortCode(s.facultyShortCode())
+        int award = PointsPolicy.pointsFor(s.cleanlinessScore());
+        if (who.clan() != null) {
+            faculties.findByShortCode(who.clan())
                     .ifPresent(f -> {
                         r.setCreditedFaculty(f);
-                        int award = PointsPolicy.pointsFor(s.cleanlinessScore());
                         f.setPoints((f.getPoints() == null ? 0 : f.getPoints()) + award);
                     });
+        }
+        if (who.userId() != null) {
+            users.addPoints(who.userId(), award);
         }
 
         Report saved = reports.save(r);
@@ -107,6 +112,9 @@ public class ReportService {
         }
         if (s.source() == null) {
             throw new IllegalArgumentException("Source required");
+        }
+        if (s.reporter() == null) {
+            throw new IllegalArgumentException("Reporter required");
         }
     }
 

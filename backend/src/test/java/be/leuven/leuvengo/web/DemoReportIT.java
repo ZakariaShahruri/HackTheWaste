@@ -4,6 +4,7 @@ import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.repository.ReportRepository;
 import be.leuven.leuvengo.security.AuthService;
 import be.leuven.leuvengo.service.GeminiService;
+import be.leuven.leuvengo.service.PointsPolicy;
 import be.leuven.leuvengo.support.TestImages;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.BeforeEach;
@@ -92,6 +93,19 @@ class DemoReportIT {
         Report report = reports.findById(((Number) JsonPath.read(body, "$.reportId")).longValue()).orElseThrow();
         assertThat(report.getReporterPseudoId()).startsWith("user-");
         assertThat(clanOf(report)).isEqualTo("EKO");
+    }
+
+    @Test
+    void aLoggedInUserEarnsThePointsThemselvesToo() throws Exception {
+        String token = auth.register("points-" + ip + "@example.be", "secret-pass", null, true).token();
+        mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.points").value(0));
+
+        upload(photo(), "50.8798", "4.7005", null, token).andExpect(status().isCreated());
+        upload(photo(), "50.8798", "4.7005", null, token).andExpect(status().isCreated());
+
+        mvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
+                .andExpect(jsonPath("$.points").value(2 * PointsPolicy.pointsFor(15)));
     }
 
     @Test

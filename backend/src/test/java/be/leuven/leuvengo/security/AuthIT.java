@@ -7,6 +7,7 @@ import be.leuven.leuvengo.domain.WorkOrder;
 import be.leuven.leuvengo.repository.AppUserRepository;
 import be.leuven.leuvengo.repository.WorkOrderRepository;
 import be.leuven.leuvengo.service.ReportService;
+import be.leuven.leuvengo.service.Reporter;
 import com.jayway.jsonpath.JsonPath;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -147,7 +148,8 @@ class AuthIT {
 
     private WorkOrder dispatchedOrder() {
         for (int i = 0; i < 3; i++) {
-            reports.submit(new ReportService.Submission(50.8525, 4.6720, 10, Report.Source.WEB, "t", null, null));
+            reports.submit(new ReportService.Submission(50.8525, 4.6720, 10, Report.Source.WEB,
+                    Reporter.anonymous("t", null), null));
         }
         return workOrders.findAll().stream()
                 .filter(w -> w.getStatus() == WorkOrder.Status.DISPATCHED)

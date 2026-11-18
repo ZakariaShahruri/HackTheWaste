@@ -226,7 +226,7 @@ public class DemoDataSeeder {
             int rating = Math.max(1, Math.min(5, baseRating + (rnd.nextInt(3) - 1)));
             reportService.submit(new ReportService.Submission(
                     lat + dLat, lng + dLng, CleanlinessScale.fromRating(rating), Report.Source.DEMO,
-                    "demo-" + facCode + "-" + i, facCode,
+                    Reporter.anonymous("demo-" + facCode + "-" + i, facCode),
                     ReportService.Evidence.tags(List.of(tags.split(",")))));
         }
     }
