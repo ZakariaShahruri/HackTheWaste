@@ -5,6 +5,7 @@ import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.domain.StreetSegment;
 import be.leuven.leuvengo.repository.ReportRepository;
 import be.leuven.leuvengo.repository.StreetSegmentRepository;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,18 +14,14 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 /**
- * Computes a 0-100 "AI cleanliness score" per street segment.
- * - Base score 100
- * - Subtract weighted severity from recent reports within the segment radius
- * - Decay older reports with a recency factor
- *
- * Real production version would also fold in image-based litter detection,
- * camera coverage and seasonal student-density. We expose the same interface.
+ * Keeps each street segment's 0-100 cleanliness score up to date from the
+ * reports around it (see {@link SegmentScorer} for the formula).
  */
 @Service
 public class ScoringService {
 
-    private static final double SEGMENT_RADIUS_M = 80;
+    /** Reports within this distance of a segment's centre count towards it. */
+    static final double SEGMENT_RADIUS_M = 80;
 
     private final ReportRepository reports;
     private final StreetSegmentRepository segments;
@@ -38,50 +35,55 @@ public class ScoringService {
         this.props = props;
     }
 
+    /** Re-scores only the segments a report at this point can influence. */
+    @Transactional
+    public void recomputeNear(double lat, double lng) {
+        Instant now = Instant.now();
+        for (StreetSegment seg : segments.findAll()) {
+            if (hasCentre(seg)
+                    && GeoUtil.distanceMeters(lat, lng, seg.getCenterLat(), seg.getCenterLng()) <= SEGMENT_RADIUS_M) {
+                GeoBox box = GeoBox.around(seg.getCenterLat(), seg.getCenterLng(), SEGMENT_RADIUS_M);
+                List<Report> nearby = reports.findRecentInBox(windowStart(now),
+                        box.latMin(), box.latMax(), box.lngMin(), box.lngMax());
+                rescore(seg, nearby, now);
+            }
+        }
+    }
+
+    /**
+     * Re-scores every segment. Runs hourly so scores relax back towards the
+     * prior as reports age, even when no new reports come in.
+     */
+    @Scheduled(cron = "${leuvengo.scoring.refresh-cron:0 0 * * * *}")
     @Transactional
     public void recomputeAll() {
-        Instant since = Instant.now().minus(props.traffic().reportTtlHours(), ChronoUnit.HOURS);
-        List<Report> recent = reports.findRecent(since);
+        Instant now = Instant.now();
+        List<Report> recent = reports.findByReportedAtGreaterThanEqual(windowStart(now));
         for (StreetSegment seg : segments.findAll()) {
-            double score = scoreFor(seg, recent);
-            seg.setAiCleanlinessScore(round1(score));
-            seg.setReportCount30d((int) recent.stream()
-                    .filter(r -> within(seg, r))
-                    .count());
-            seg.setLastEvaluatedAt(Instant.now());
-            segments.save(seg);
+            if (hasCentre(seg)) rescore(seg, recent, now);
         }
     }
 
-    private double scoreFor(StreetSegment seg, List<Report> recent) {
-        double penalty = 0d;
-        for (Report r : recent) {
-            if (!within(seg, r)) continue;
-            // rating 0 -> filthy -> penalty 12. rating 5 -> pristine -> +1.
-            double sevPenalty = (3.0 - r.getCleanlinessRating()) * 4;
-            double recency = recencyFactor(r.getReportedAt());
-            penalty += sevPenalty * recency;
-        }
-        double score = 100 - penalty;
-        if (score < 0) score = 0;
-        if (score > 100) score = 100;
-        return score;
+    private void rescore(StreetSegment seg, List<Report> candidates, Instant now) {
+        List<SegmentScorer.Observation> observations = candidates.stream()
+                .filter(r -> GeoUtil.distanceMeters(seg.getCenterLat(), seg.getCenterLng(),
+                        r.getLat(), r.getLng()) <= SEGMENT_RADIUS_M)
+                .map(r -> new SegmentScorer.Observation(r.getCleanlinessScore(), r.getReportedAt()))
+                .toList();
+        seg.setAiCleanlinessScore(round1(SegmentScorer.score(observations, now)));
+        seg.setRecentReportCount(observations.size());
+        seg.setLastEvaluatedAt(now);
     }
 
-    private boolean within(StreetSegment seg, Report r) {
-        if (seg.getCenterLat() == null || seg.getCenterLng() == null) return false;
-        return GeoUtil.distanceMeters(seg.getCenterLat(), seg.getCenterLng(),
-                r.getLat(), r.getLng()) <= SEGMENT_RADIUS_M;
+    private Instant windowStart(Instant now) {
+        return now.minus(props.traffic().reportTtlHours(), ChronoUnit.HOURS);
     }
 
-    private double recencyFactor(Instant when) {
-        if (when == null) return 0.5;
-        long hours = Math.max(0, ChronoUnit.HOURS.between(when, Instant.now()));
-        // exponential decay - 24h half-life
-        return Math.pow(0.5, hours / 24.0);
+    private static boolean hasCentre(StreetSegment seg) {
+        return seg.getCenterLat() != null && seg.getCenterLng() != null;
     }
 
-    private double round1(double v) {
+    private static double round1(double v) {
         return Math.round(v * 10.0) / 10.0;
     }
 }

@@ -134,7 +134,7 @@ export function StudentMap({
               <br />
               Held by: {s.facultyName ?? "—"}
               <br />
-              Reports (recent): {s.reportCount30d}
+              Reports (recent): {s.recentReportCount}
             </Popup>
           </CircleMarker>
         ))}
@@ -159,7 +159,7 @@ export function StudentMap({
                 <br />
                 {h.reportCount} reports merged
                 <br />
-                Severity {h.severity?.toFixed(1)} / 5
+                Cleanliness {Math.round(h.cleanliness)} / 100
               </Popup>
             </CircleMarker>
           ))}

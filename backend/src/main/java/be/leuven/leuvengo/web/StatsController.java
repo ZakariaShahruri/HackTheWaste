@@ -63,7 +63,7 @@ public class StatsController {
             String key = LocalDate.now().minusDays(i).format(fmt);
             counts.put(key, 0L);
         }
-        for (Report r : reports.findRecent(since)) {
+        for (Report r : reports.findByReportedAtGreaterThanEqual(since)) {
             String key = r.getReportedAt().atZone(ZoneId.systemDefault())
                     .toLocalDate().format(fmt);
             counts.merge(key, 1L, Long::sum);

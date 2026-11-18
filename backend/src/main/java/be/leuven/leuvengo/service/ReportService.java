@@ -1,7 +1,7 @@
 package be.leuven.leuvengo.service;
 
 import be.leuven.leuvengo.config.LeuvenGoProperties;
-import be.leuven.leuvengo.domain.Faculty;
+import be.leuven.leuvengo.domain.CleanlinessScale;
 import be.leuven.leuvengo.domain.Hotspot;
 import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.repository.FacultyRepository;
@@ -36,7 +36,8 @@ public class ReportService {
         this.props = props;
     }
 
-    public record Submission(Double lat, Double lng, Integer rating,
+    /** A report entering the pipeline; {@code cleanlinessScore} is 0-100 (100 = clean). */
+    public record Submission(Double lat, Double lng, Integer cleanlinessScore,
                              String note, String imageRef,
                              String signalTags, String facultyShortCode,
                              String reporterPseudoId) {}
@@ -48,7 +49,7 @@ public class ReportService {
         Report r = new Report();
         r.setLat(s.lat());
         r.setLng(s.lng());
-        r.setCleanlinessRating(s.rating());
+        r.setCleanlinessScore(s.cleanlinessScore());
         r.setNote(safe(s.note(), 500));
         r.setImageRef(s.imageRef());
         r.setSignalTags(safe(s.signalTags(), 200));
@@ -60,10 +61,8 @@ public class ReportService {
             faculties.findByShortCode(s.facultyShortCode())
                     .ifPresent(f -> {
                         r.setCrediteFaculty(f);
-                        // award points - dirty reports earn more (unique signal value)
-                        int award = 6 - s.rating();
-                        f.setPoints((f.getPoints() == null ? 0 : f.getPoints()) + Math.max(1, award));
-                        faculties.save(f);
+                        int award = PointsPolicy.pointsFor(s.cleanlinessScore());
+                        f.setPoints((f.getPoints() == null ? 0 : f.getPoints()) + award);
                     });
         }
 
@@ -79,7 +78,7 @@ public class ReportService {
             planon.dispatch(h);
         }
 
-        scoring.recomputeAll();
+        scoring.recomputeNear(saved.getLat(), saved.getLng());
         return saved;
     }
 
@@ -87,8 +86,10 @@ public class ReportService {
         if (s.lat() == null || s.lng() == null) {
             throw new IllegalArgumentException("Coordinates required");
         }
-        if (s.rating() == null || s.rating() < 0 || s.rating() > 5) {
-            throw new IllegalArgumentException("Rating must be 0-5");
+        if (s.cleanlinessScore() == null
+                || s.cleanlinessScore() < CleanlinessScale.MIN_SCORE
+                || s.cleanlinessScore() > CleanlinessScale.MAX_SCORE) {
+            throw new IllegalArgumentException("Cleanliness score must be 0-100");
         }
     }
 
@@ -97,8 +98,4 @@ public class ReportService {
         return v.length() <= max ? v : v.substring(0, max);
     }
 
-    public Faculty crediteFacultyOrDefault(String code) {
-        return faculties.findByShortCode(code)
-                .orElseGet(() -> faculties.findAll().stream().findFirst().orElse(null));
-    }
 }

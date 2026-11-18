@@ -1,5 +1,6 @@
 package be.leuven.leuvengo.service;
 
+import be.leuven.leuvengo.domain.CleanlinessScale;
 import be.leuven.leuvengo.domain.*;
 import be.leuven.leuvengo.repository.*;
 
@@ -151,7 +152,7 @@ public class DemoDataSeeder {
         s.setCenterLat(lat);
         s.setCenterLng(lng);
         s.setAiCleanlinessScore(80d);
-        s.setReportCount30d(0);
+        s.setRecentReportCount(0);
         s.setLastEvaluatedAt(Instant.now());
         s.setFaculty(f);
         return s;
@@ -213,7 +214,7 @@ public class DemoDataSeeder {
             double dLng = rnd.nextGaussian() * 0.0008;
             int rating = Math.max(1, Math.min(5, baseRating + (rnd.nextInt(3) - 1)));
             reportService.submit(new ReportService.Submission(
-                    lat + dLat, lng + dLng, rating,
+                    lat + dLat, lng + dLng, CleanlinessScale.fromRating(rating),
                     "Predictive Analysis: High probability zone (" + tags + ")",
                     null, tags,
                     facCode, "ai-seed-" + facCode + "-" + i + "-" + rnd.nextInt(1000)));

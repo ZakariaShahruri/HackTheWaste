@@ -67,13 +67,14 @@ public class TrafficService {
         Hotspot h = new Hotspot();
         h.setCenterLat(report.getLat());
         h.setCenterLng(report.getLng());
-        h.setSeverity(report.getCleanlinessRating().doubleValue());
+        h.setMeanCleanliness(report.getCleanlinessScore().doubleValue());
         h.setReportCount(1);
         h.setStatus(Hotspot.Status.OPEN);
         h.setCreatedAt(Instant.now());
         h.setLastUpdatedAt(Instant.now());
-        h.setLabel(deriveLabel(report.getLat(), report.getLng()));
-        h.setStreetSegment(nearestSegment(report.getLat(), report.getLng()).orElse(null));
+        StreetSegment segment = nearestSegment(report.getLat(), report.getLng()).orElse(null);
+        h.setStreetSegment(segment);
+        h.setLabel(segment != null ? segment.getName() : "Leuven");
         return h;
     }
 
@@ -83,13 +84,12 @@ public class TrafficService {
         // weighted centroid
         double lat = (h.getCenterLat() * prev + r.getLat()) / next;
         double lng = (h.getCenterLng() * prev + r.getLng()) / next;
-        // running mean severity
-        double sev = ((h.getSeverity() == null ? 0 : h.getSeverity()) * prev
-                + r.getCleanlinessRating()) / next;
+        double mean = ((h.getMeanCleanliness() == null ? 0 : h.getMeanCleanliness()) * prev
+                + r.getCleanlinessScore()) / next;
         h.setCenterLat(lat);
         h.setCenterLng(lng);
         h.setReportCount(next);
-        h.setSeverity(sev);
+        h.setMeanCleanliness(mean);
         h.setLastUpdatedAt(Instant.now());
     }
 
@@ -101,7 +101,4 @@ public class TrafficService {
                         GeoUtil.distanceMeters(lat, lng, b.getCenterLat(), b.getCenterLng())));
     }
 
-    private String deriveLabel(double lat, double lng) {
-        return nearestSegment(lat, lng).map(StreetSegment::getName).orElse("Leuven");
-    }
 }

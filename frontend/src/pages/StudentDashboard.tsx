@@ -241,7 +241,7 @@ export default function StudentDashboard() {
                       <span className="muted">—</span>
                     )}
                   </td>
-                  <td>{s.reportCount30d}</td>
+                  <td>{s.recentReportCount}</td>
                   <td>
                     <ScoreChip score={s.aiCleanlinessScore ?? 0} />
                   </td>

@@ -1,5 +1,6 @@
 package be.leuven.leuvengo.web;
 
+import be.leuven.leuvengo.domain.CleanlinessScale;
 import be.leuven.leuvengo.domain.PendingReport;
 import be.leuven.leuvengo.domain.TrashPhoto;
 import be.leuven.leuvengo.repository.PendingReportRepository;
@@ -114,8 +115,7 @@ public class WhatsAppController {
                     + "Please take a real photo of the litter where you are standing and send it again.");
         }
 
-        int cleanlinessScore = ai.score();          // 0-100 (100 = clean)
-        int rating = toRating(cleanlinessScore);    // 1-5 dirtiness for pipeline
+        int cleanlinessScore = ai.score();
 
         // Upload to Azure Blob Storage; fall back to Twilio URL if upload fails
         String pseudoId = pseudoIdFor(from);
@@ -123,14 +123,14 @@ public class WhatsAppController {
                 .orElse(mediaUrl);
 
         pr.setMediaUrl(photoUrl);
-        pr.setCleanlinessScore(rating);
+        pr.setCleanlinessScore(cleanlinessScore);
         pr.setCompleted(true);
         pending.save(pr);
 
         // Push into hotspot pipeline (maps, work orders, leaderboard)
         try {
             reportService.submit(new ReportService.Submission(
-                    pr.getLat(), pr.getLng(), rating,
+                    pr.getLat(), pr.getLng(), cleanlinessScore,
                     "WhatsApp report",
                     photoUrl,
                     ai.tags().isEmpty() ? null : String.join(",", ai.tags()),
@@ -149,7 +149,7 @@ public class WhatsAppController {
             photo.setLat(pr.getLat());
             photo.setLng(pr.getLng());
             photo.setCleanlinessScore(cleanlinessScore);
-            photo.setUserRating(rating);
+            photo.setUserRating(CleanlinessScale.toRating(cleanlinessScore));
             photo.setTags(ai.tags().isEmpty() ? null : String.join(",", ai.tags()));
             photo.setReportedAt(Instant.now());
             photos.save(photo);
@@ -160,20 +160,13 @@ public class WhatsAppController {
         return reply(buildReply(cleanlinessScore, ai.description(), ai.tags()));
     }
 
-    /** Converts 0-100 cleanliness score to a 1-5 dirtiness rating for the pipeline. */
-    private static int toRating(int cleanlinessScore) {
-        if (cleanlinessScore >= 80) return 1;
-        if (cleanlinessScore >= 60) return 2;
-        if (cleanlinessScore >= 40) return 3;
-        if (cleanlinessScore >= 20) return 4;
-        return 5;
-    }
-
     private static String buildReply(int score, String description, List<String> tags) {
-        String label = score >= 80 ? "Clean 🟢"
-                : score >= 60 ? "Mild litter 🟡"
-                : score >= 40 ? "Moderate waste 🟠"
-                : "Critical — urgent cleanup needed 🔴";
+        String label = CleanlinessScale.label(score) + switch (CleanlinessScale.toRating(score)) {
+            case 4, 5 -> " 🟢";
+            case 3 -> " 🟡";
+            case 2 -> " 🟠";
+            default -> " 🔴";
+        };
 
         StringBuilder sb = new StringBuilder();
         sb.append("🤖 AI Analysis complete!\n\n");

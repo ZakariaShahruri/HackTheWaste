@@ -2,7 +2,8 @@ export interface HotspotDto {
   id: number;
   lat: number;
   lng: number;
-  severity: number;
+  /** Mean cleanliness (0-100, 100 = clean) of the merged reports. */
+  cleanliness: number;
   reportCount: number;
   status: "OPEN" | "ESCALATED" | "DISPATCHED" | "RESOLVED";
   label?: string;
@@ -18,7 +19,7 @@ export interface StreetSegmentDto {
   lat: number;
   lng: number;
   aiCleanlinessScore: number;
-  reportCount30d: number;
+  recentReportCount: number;
   facultyShortCode?: string;
   facultyName?: string;
   facultyColor?: string;

@@ -1,7 +1,6 @@
 package be.leuven.leuvengo.web.dto;
 
 import be.leuven.leuvengo.domain.*;
-import be.leuven.leuvengo.domain.TrashPhoto;
 
 import java.time.Instant;
 import java.util.List;
@@ -11,13 +10,13 @@ public final class Dtos {
 
     private Dtos() {}
 
-    public record HotspotDto(Long id, Double lat, Double lng, Double severity,
+    public record HotspotDto(Long id, Double lat, Double lng, Double cleanliness,
                              Integer reportCount, String status, String label,
                              String segmentName, Instant createdAt, Instant lastUpdatedAt) {}
 
     public record StreetSegmentDto(Long id, String name, String district,
                                    Double lat, Double lng, Double aiCleanlinessScore,
-                                   Integer reportCount30d, String facultyShortCode,
+                                   Integer recentReportCount, String facultyShortCode,
                                    String facultyName, String facultyColor,
                                    Instant lastEvaluatedAt) {}
 
@@ -55,7 +54,7 @@ public final class Dtos {
 
     public static HotspotDto of(Hotspot h) {
         return new HotspotDto(
-                h.getId(), h.getCenterLat(), h.getCenterLng(), h.getSeverity(),
+                h.getId(), h.getCenterLat(), h.getCenterLng(), h.getMeanCleanliness(),
                 h.getReportCount(),
                 h.getStatus() != null ? h.getStatus().name() : null,
                 h.getLabel(),
@@ -67,7 +66,7 @@ public final class Dtos {
         Faculty f = s.getFaculty();
         return new StreetSegmentDto(
                 s.getId(), s.getName(), s.getDistrict(), s.getCenterLat(), s.getCenterLng(),
-                s.getAiCleanlinessScore(), s.getReportCount30d(),
+                s.getAiCleanlinessScore(), s.getRecentReportCount(),
                 f != null ? f.getShortCode() : null,
                 f != null ? f.getName() : null,
                 f != null ? f.getColor() : null,

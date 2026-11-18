@@ -9,6 +9,14 @@ import java.util.List;
 
 public interface ReportRepository extends JpaRepository<Report, Long> {
 
-    @Query("select r from Report r where r.reportedAt >= :since")
-    List<Report> findRecent(Instant since);
+    List<Report> findByReportedAtGreaterThanEqual(Instant since);
+
+    @Query("""
+            select r from Report r
+            where r.reportedAt >= :since
+              and r.lat between :latMin and :latMax
+              and r.lng between :lngMin and :lngMax
+            """)
+    List<Report> findRecentInBox(Instant since, double latMin, double latMax,
+                                 double lngMin, double lngMax);
 }

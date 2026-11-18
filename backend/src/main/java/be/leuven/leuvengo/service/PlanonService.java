@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 
 /**
@@ -51,9 +52,9 @@ public class PlanonService {
         w.setPriority(priorityFor(h));
         w.setStatus(WorkOrder.Status.PENDING);
         w.setCrew(routeCrew(h));
-        w.setSummary(String.format("Cluster of %d reports - severity %.1f at %s",
+        w.setSummary(String.format(Locale.ROOT, "Cluster of %d reports - cleanliness %.0f/100 at %s",
                 h.getReportCount(),
-                h.getSeverity() == null ? 0 : h.getSeverity(),
+                h.getMeanCleanliness() == null ? 0 : h.getMeanCleanliness(),
                 h.getLabel() == null ? "Leuven" : h.getLabel()));
         w.setCreatedAt(Instant.now());
         WorkOrder saved = workOrders.save(w);
@@ -86,11 +87,16 @@ public class PlanonService {
     }
 
     private WorkOrder.Priority priorityFor(Hotspot h) {
-        double sev = h.getSeverity() == null ? 3 : h.getSeverity();
-        int count = h.getReportCount() == null ? 1 : h.getReportCount();
-        if (sev <= 1.0 || count >= 6) return WorkOrder.Priority.URGENT;
-        if (sev <= 2.0 || count >= 4) return WorkOrder.Priority.HIGH;
-        if (sev <= 3.0) return WorkOrder.Priority.MEDIUM;
+        return priorityFor(
+                h.getMeanCleanliness() == null ? 60 : h.getMeanCleanliness(),
+                h.getReportCount() == null ? 1 : h.getReportCount());
+    }
+
+    /** Dirtier and busier hotspots get a crew sooner. */
+    static WorkOrder.Priority priorityFor(double meanCleanliness, int reportCount) {
+        if (meanCleanliness <= 20 || reportCount >= 6) return WorkOrder.Priority.URGENT;
+        if (meanCleanliness <= 40 || reportCount >= 4) return WorkOrder.Priority.HIGH;
+        if (meanCleanliness <= 60) return WorkOrder.Priority.MEDIUM;
         return WorkOrder.Priority.LOW;
     }
 

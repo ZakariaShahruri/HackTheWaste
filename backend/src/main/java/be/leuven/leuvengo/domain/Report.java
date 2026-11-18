@@ -26,9 +26,9 @@ public class Report {
     @Column(nullable = false)
     private Double lng;
 
-    /** 0 = filthy, 5 = pristine. */
+    /** 0-100, see {@link CleanlinessScale}. */
     @Column(nullable = false)
-    private Integer cleanlinessRating;
+    private Integer cleanlinessScore;
 
     /** Free-text observation, e.g. "overflowing bin", "broken glass". */
     @Column(length = 500)
@@ -61,8 +61,8 @@ public class Report {
     public void setLat(Double lat) { this.lat = lat; }
     public Double getLng() { return lng; }
     public void setLng(Double lng) { this.lng = lng; }
-    public Integer getCleanlinessRating() { return cleanlinessRating; }
-    public void setCleanlinessRating(Integer v) { this.cleanlinessRating = v; }
+    public Integer getCleanlinessScore() { return cleanlinessScore; }
+    public void setCleanlinessScore(Integer v) { this.cleanlinessScore = v; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
     public String getImageRef() { return imageRef; }

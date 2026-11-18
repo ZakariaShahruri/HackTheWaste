@@ -66,7 +66,7 @@ export function HotspotMap({ hotspots, height = 520 }: Props) {
                 <br />
                 Reports: {h.reportCount}
                 <br />
-                Severity: {h.severity?.toFixed(1)} / 5
+                Cleanliness: {Math.round(h.cleanliness)} / 100
                 <br />
                 Status: {h.status}
               </Popup>

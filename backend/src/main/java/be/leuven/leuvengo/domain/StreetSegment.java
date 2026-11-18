@@ -19,7 +19,8 @@ public class StreetSegment {
     private Double centerLng;
     /** 0-100 - higher = cleaner. Derived from rolling reports + image signals. */
     private Double aiCleanlinessScore;
-    private Integer reportCount30d;
+    /** Reports near this segment within the scoring window. */
+    private Integer recentReportCount;
     private Instant lastEvaluatedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -38,8 +39,8 @@ public class StreetSegment {
     public void setCenterLng(Double centerLng) { this.centerLng = centerLng; }
     public Double getAiCleanlinessScore() { return aiCleanlinessScore; }
     public void setAiCleanlinessScore(Double v) { this.aiCleanlinessScore = v; }
-    public Integer getReportCount30d() { return reportCount30d; }
-    public void setReportCount30d(Integer v) { this.reportCount30d = v; }
+    public Integer getRecentReportCount() { return recentReportCount; }
+    public void setRecentReportCount(Integer v) { this.recentReportCount = v; }
     public Instant getLastEvaluatedAt() { return lastEvaluatedAt; }
     public void setLastEvaluatedAt(Instant v) { this.lastEvaluatedAt = v; }
     public Faculty getFaculty() { return faculty; }

@@ -1,0 +1,87 @@
+package be.leuven.leuvengo.service;
+
+import be.leuven.leuvengo.domain.Hotspot;
+import be.leuven.leuvengo.domain.Report;
+import be.leuven.leuvengo.domain.StreetSegment;
+import be.leuven.leuvengo.domain.WorkOrder;
+import be.leuven.leuvengo.repository.FacultyRepository;
+import be.leuven.leuvengo.repository.StreetSegmentRepository;
+import be.leuven.leuvengo.repository.WorkOrderRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Runs reports through the real pipeline (clustering, escalation, scoring,
+ * points) against the seeded demo city. Gasthuisberg has no seeded reports,
+ * so everything measured here is caused by the test.
+ */
+@SpringBootTest
+@Transactional
+class ReportPipelineIT {
+
+    private static final double LAT = 50.8525;
+    private static final double LNG = 4.6720;
+
+    @Autowired ReportService reportService;
+    @Autowired StreetSegmentRepository segments;
+    @Autowired FacultyRepository faculties;
+    @Autowired WorkOrderRepository workOrders;
+
+    @Test
+    void thirdNearbyReportEscalatesToAPlanonWorkOrder() {
+        Report first = submit(10);
+        submit(15);
+        assertThat(first.getHotspot().getStatus()).isEqualTo(Hotspot.Status.OPEN);
+
+        Report third = submit(5);
+        Hotspot hotspot = third.getHotspot();
+
+        assertThat(hotspot).isSameAs(first.getHotspot());
+        assertThat(hotspot.getReportCount()).isEqualTo(3);
+        assertThat(hotspot.getMeanCleanliness()).isEqualTo(10.0);
+        assertThat(hotspot.getStatus()).isEqualTo(Hotspot.Status.DISPATCHED);
+
+        WorkOrder order = workOrders.findAll().stream()
+                .filter(w -> w.getHotspot().getId().equals(hotspot.getId()))
+                .findFirst().orElseThrow();
+        assertThat(order.getStatus()).isEqualTo(WorkOrder.Status.DISPATCHED);
+        assertThat(order.getPriority()).isEqualTo(WorkOrder.Priority.URGENT);
+        assertThat(order.getPlanonRef()).startsWith("PLN-");
+    }
+
+    @Test
+    void filthyReportsLowerTheStreetScore() {
+        StreetSegment street = gasthuisberg();
+        double before = street.getAiCleanlinessScore();
+
+        submit(0);
+
+        assertThat(gasthuisberg().getAiCleanlinessScore()).isLessThan(before);
+        assertThat(gasthuisberg().getRecentReportCount()).isEqualTo(1);
+    }
+
+    @Test
+    void reportsCreditTheChosenClanByPointsPolicy() {
+        int before = faculties.findByShortCode("FAR").orElseThrow().getPoints();
+
+        submit(0);
+
+        assertThat(faculties.findByShortCode("FAR").orElseThrow().getPoints())
+                .isEqualTo(before + PointsPolicy.pointsFor(0));
+    }
+
+    private Report submit(int score) {
+        return reportService.submit(new ReportService.Submission(
+                LAT, LNG, score, "test", null, null, "FAR", "test-reporter"));
+    }
+
+    private StreetSegment gasthuisberg() {
+        return segments.findAll().stream()
+                .filter(s -> s.getName().equals("Gasthuisberg"))
+                .findFirst().orElseThrow();
+    }
+}

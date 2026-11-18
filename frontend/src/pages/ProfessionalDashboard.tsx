@@ -139,7 +139,7 @@ export default function ProfessionalDashboard() {
                 <div>
                   <div style={{ fontWeight: 600 }}>{h.label ?? "Hotspot"}</div>
                   <div className="muted" style={{ fontSize: 12 }}>
-                    {h.reportCount} reports · severity {h.severity?.toFixed(1)}
+                    {h.reportCount} reports · cleanliness {Math.round(h.cleanliness)}/100
                   </div>
                 </div>
                 <StatusTag value={h.status} />
@@ -180,7 +180,7 @@ export default function ProfessionalDashboard() {
                     <strong>{s.name}</strong>
                   </td>
                   <td className="muted">{s.district ?? "—"}</td>
-                  <td>{s.reportCount30d ?? 0}</td>
+                  <td>{s.recentReportCount ?? 0}</td>
                   <td>
                     {s.facultyName ? (
                       <span

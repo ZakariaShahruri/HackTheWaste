@@ -19,8 +19,8 @@ public class Hotspot {
     @Column(nullable = false)
     private Double centerLng;
 
-    /** Mean rating across merged reports (0-5, lower is dirtier). */
-    private Double severity;
+    /** Mean cleanliness score (0-100) of the merged reports. */
+    private Double meanCleanliness;
 
     /** How many reports merged into this hotspot. */
     private Integer reportCount;
@@ -44,8 +44,8 @@ public class Hotspot {
     public void setCenterLat(Double centerLat) { this.centerLat = centerLat; }
     public Double getCenterLng() { return centerLng; }
     public void setCenterLng(Double centerLng) { this.centerLng = centerLng; }
-    public Double getSeverity() { return severity; }
-    public void setSeverity(Double severity) { this.severity = severity; }
+    public Double getMeanCleanliness() { return meanCleanliness; }
+    public void setMeanCleanliness(Double meanCleanliness) { this.meanCleanliness = meanCleanliness; }
     public Integer getReportCount() { return reportCount; }
     public void setReportCount(Integer reportCount) { this.reportCount = reportCount; }
     public Status getStatus() { return status; }
