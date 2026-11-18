@@ -36,3 +36,12 @@ def test_invalid_time_is_a_400():
 def test_points_outside_leuven_are_rejected():
     resp = client.post("/predict", json={"latitude": 52.37, "longitude": 4.90, "time": NOON})
     assert resp.status_code == 422
+
+
+def test_browsers_are_not_allowed_to_call_the_service_directly():
+    resp = client.post(
+        "/predict",
+        json={"latitude": 50.88, "longitude": 4.70, "time": NOON},
+        headers={"Origin": "https://leuvengo.example"},
+    )
+    assert "access-control-allow-origin" not in resp.headers
