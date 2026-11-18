@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
-import { errorMessage } from "../api/http";
+import { assetUrl, errorMessage } from "../api/http";
 import { useApi } from "../hooks/useApi";
 import { ScoreChip } from "../components/ScoreChip";
 import type { TrashPhotoDto } from "../api/types";
@@ -141,7 +141,7 @@ function PhotoCard({ photo: p }: { photo: TrashPhotoDto }) {
       {/* Photo or placeholder */}
       {p.photoUrl && !imgError ? (
         <img
-          src={p.photoUrl}
+          src={assetUrl(p.photoUrl)}
           alt={`Trash report at ${p.segmentName ?? "Leuven"}`}
           className="feed-photo"
           onError={() => setImgError(true)}

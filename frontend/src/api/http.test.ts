@@ -71,3 +71,22 @@ describe("request", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 });
+
+describe("assetUrl", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("leaves absolute urls alone", async () => {
+    const { assetUrl } = await import("./http");
+    expect(assetUrl("https://blob.example/p.jpg")).toBe("https://blob.example/p.jpg");
+  });
+
+  it("prefixes backend paths with the api origin", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://api.leuvengo.example");
+    vi.resetModules();
+    const { assetUrl } = await import("./http");
+    expect(assetUrl("/api/photos/abc")).toBe("https://api.leuvengo.example/api/photos/abc");
+  });
+});

@@ -5,6 +5,7 @@ import { api } from "../api/client";
 import { ScoreChip } from "../components/ScoreChip";
 import { WhatsAppReportCTA } from "../components/WhatsAppReportCTA";
 import type { TrashPhotoDto } from "../api/types";
+import { assetUrl } from "../api/http";
 
 export default function LandingPage() {
   const POLL = { pollMs: 10000 };
@@ -123,7 +124,7 @@ function LandingPhotoCard({ photo: p }: { photo: TrashPhotoDto }) {
     <div className="feed-card">
       {p.photoUrl && !imgError ? (
         <img
-          src={p.photoUrl}
+          src={assetUrl(p.photoUrl)}
           alt={`Trash report at ${p.segmentName ?? "Leuven"}`}
           className="feed-photo"
           onError={() => setImgError(true)}

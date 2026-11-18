@@ -1,6 +1,15 @@
 import { readStoredUser } from "../lib/authStorage";
 
-const BASE = (import.meta.env.VITE_API_BASE_URL ?? "") + "/api";
+const API_ORIGIN = import.meta.env.VITE_API_BASE_URL ?? "";
+const BASE = API_ORIGIN + "/api";
+
+/**
+ * Photos stored by the backend come back as "/api/..." paths. In production the
+ * frontend runs on a different host, so those need the API origin in front.
+ */
+export function assetUrl(url: string): string {
+  return url.startsWith("/api/") ? API_ORIGIN + url : url;
+}
 
 /** Error thrown for any non-2xx response, carrying the HTTP status. */
 export class ApiError extends Error {
