@@ -4,87 +4,38 @@ FastAPI prediction server.
 Endpoints:
   GET  /health              → {"status": "ok", "model_metrics": {...}}
   POST /predict             → single prediction
-  POST /predict/batch       → batch predictions for heatmap grid
-  POST /predict/grid        → auto-generate Leuven grid at given time
+  POST /predict/batch       → many points in one call
+  POST /predict/grid        → a regular grid over Leuven at one time, for the heatmap
 
 Run:
   uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 """
 
-import json
-import joblib
-import numpy as np
 from datetime import datetime
-from pathlib import Path
+
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-MODEL_DIR = Path("model")
+import model_io
+from features import build_features
 
-# ---------------------------------------------------------------------------
-# Load model at startup
-# ---------------------------------------------------------------------------
+rf, MODEL_METRICS = model_io.load()
 
-def _load():
-    model_path   = MODEL_DIR / "rf_trash.joblib"
-    feature_path = MODEL_DIR / "feature_names.json"
-    metrics_path = MODEL_DIR / "metrics.json"
-    if not model_path.exists():
-        raise RuntimeError("Model not found — run train.py first.")
-    rf       = joblib.load(model_path)
-    features = json.loads(feature_path.read_text())
-    metrics  = json.loads(metrics_path.read_text()) if metrics_path.exists() else {}
-    return rf, features, metrics
-
-rf, FEATURE_NAMES, MODEL_METRICS = _load()
-
-LEUVEN_CENTER = (50.8798, 4.7005)
-HOTSPOTS = {
-    "oude_markt":      (50.8793, 4.7005),
-    "station":         (50.8820, 4.7163),
-    "bondgenotenlaan": (50.8790, 4.7020),
-    "ku_leuven":       (50.8751, 4.6980),
-    "stadspark":       (50.8761, 4.6956),
-    "naamsestraat":    (50.8764, 4.7009),
-    "diestsestraat":   (50.8830, 4.7050),
-    "ladeuzeplein":    (50.8778, 4.7046),
-}
-
-# ---------------------------------------------------------------------------
-# Feature engineering (mirrors train.py)
-# ---------------------------------------------------------------------------
-
-def haversine_km(lat1, lng1, lat2, lng2):
-    R = 6371.0
-    dlat = np.radians(lat2 - lat1)
-    dlng = np.radians(lng2 - lng1)
-    a = (np.sin(dlat / 2) ** 2
-         + np.cos(np.radians(lat1)) * np.cos(np.radians(lat2)) * np.sin(dlng / 2) ** 2)
-    return R * 2 * np.arcsin(np.sqrt(np.clip(a, 0, 1)))
+MAX_BATCH = 5_000
 
 
-def build_row(lat: float, lng: float, ts: datetime) -> list:
-    hour  = ts.hour
-    dow   = ts.weekday()
-    month = ts.month
-    is_weekend = int(dow >= 5)
-    is_night   = int(hour >= 22 or hour <= 3)
-    is_rush    = int((7 <= hour <= 9) or (17 <= hour <= 19))
-
-    dist_center = haversine_km(lat, lng, *LEUVEN_CENTER)
-    hotspot_dists = [haversine_km(lat, lng, hlat, hlng) for hlat, hlng in HOTSPOTS.values()]
-
-    return [lat, lng, hour, dow, month, is_weekend, is_night, is_rush, dist_center] + hotspot_dists
+def predict(lats, lngs, times) -> list[float]:
+    scores = np.clip(rf.predict(build_features(lats, lngs, times)), 0.0, 1.0)
+    return [round(float(s), 4) for s in scores]
 
 
-def predict_one(lat: float, lng: float, ts: datetime) -> float:
-    row = np.array(build_row(lat, lng, ts)).reshape(1, -1)
-    score = float(rf.predict(row)[0])
-    return round(float(np.clip(score, 0.0, 1.0)), 4)
+def parse_time(value: str) -> datetime:
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(400, f"Invalid ISO-8601 time: {value}")
 
-# ---------------------------------------------------------------------------
-# FastAPI app
-# ---------------------------------------------------------------------------
 
 # No CORS on purpose: only the backend calls this service, browsers never do.
 app = FastAPI(title="Leuven Trash Likelihood API", version="1.0.0")
@@ -125,59 +76,40 @@ def health():
 
 
 @app.post("/predict", response_model=PredictResponse)
-def predict(req: PredictRequest):
-    try:
-        ts = datetime.fromisoformat(req.time)
-    except ValueError:
-        raise HTTPException(400, "Invalid ISO-8601 time format")
-    score = predict_one(req.latitude, req.longitude, ts)
-    return PredictResponse(
-        latitude=req.latitude, longitude=req.longitude,
-        time=req.time, likelihood=score
-    )
+def predict_one(req: PredictRequest):
+    return predict_batch(BatchRequest(points=[req]))[0]
 
 
 @app.post("/predict/batch", response_model=list[PredictResponse])
 def predict_batch(req: BatchRequest):
-    if len(req.points) > 5_000:
-        raise HTTPException(400, "Max 5000 points per batch")
-    results = []
-    for p in req.points:
-        try:
-            ts = datetime.fromisoformat(p.time)
-        except ValueError:
-            raise HTTPException(400, f"Invalid time: {p.time}")
-        score = predict_one(p.latitude, p.longitude, ts)
-        results.append(PredictResponse(
-            latitude=p.latitude, longitude=p.longitude,
-            time=p.time, likelihood=score
-        ))
-    return results
+    if len(req.points) > MAX_BATCH:
+        raise HTTPException(400, f"Max {MAX_BATCH} points per batch")
+    if not req.points:
+        return []
+    scores = predict(
+        [p.latitude for p in req.points],
+        [p.longitude for p in req.points],
+        [parse_time(p.time) for p in req.points],
+    )
+    return [
+        PredictResponse(latitude=p.latitude, longitude=p.longitude, time=p.time, likelihood=score)
+        for p, score in zip(req.points, scores)
+    ]
 
 
 @app.post("/predict/grid")
 def predict_grid(req: GridRequest):
-    """Returns a flat list of {lat, lng, likelihood} for a regular grid — used to render the predictive heatmap."""
-    try:
-        ts = datetime.fromisoformat(req.time)
-    except ValueError:
-        raise HTTPException(400, "Invalid ISO-8601 time format")
-
-    lats = np.linspace(req.lat_min, req.lat_max, req.lat_steps)
-    lngs = np.linspace(req.lng_min, req.lng_max, req.lng_steps)
-
-    rows = []
-    X = []
-    coords = []
-    for lat in lats:
-        for lng in lngs:
-            X.append(build_row(lat, lng, ts))
-            coords.append((round(float(lat), 6), round(float(lng), 6)))
-
-    preds = rf.predict(np.array(X))
-    preds = np.clip(preds, 0.0, 1.0)
-
-    for (lat, lng), score in zip(coords, preds):
-        rows.append({"lat": lat, "lng": lng, "likelihood": round(float(score), 4)})
-
-    return {"time": req.time, "count": len(rows), "points": rows}
+    """A flat list of {lat, lng, likelihood}, row by row from lat_min."""
+    ts = parse_time(req.time)
+    lats, lngs = np.meshgrid(
+        np.linspace(req.lat_min, req.lat_max, req.lat_steps),
+        np.linspace(req.lng_min, req.lng_max, req.lng_steps),
+        indexing="ij",
+    )
+    lats, lngs = lats.ravel(), lngs.ravel()
+    scores = predict(lats, lngs, [ts] * len(lats))
+    points = [
+        {"lat": round(float(lat), 6), "lng": round(float(lng), 6), "likelihood": score}
+        for lat, lng, score in zip(lats, lngs, scores)
+    ]
+    return {"time": req.time, "count": len(points), "points": points}

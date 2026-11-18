@@ -45,3 +45,17 @@ def test_browsers_are_not_allowed_to_call_the_service_directly():
         headers={"Origin": "https://leuvengo.example"},
     )
     assert "access-control-allow-origin" not in resp.headers
+
+
+def test_a_batch_scores_each_point_like_a_single_prediction():
+    points = [
+        {"latitude": 50.8793, "longitude": 4.7005, "time": "2026-11-21T23:00:00"},
+        {"latitude": 50.8700, "longitude": 4.6900, "time": "2026-11-18T08:30:00"},
+    ]
+    batch = client.post("/predict/batch", json={"points": points}).json()
+    singles = [client.post("/predict", json=p).json() for p in points]
+    assert batch == singles
+
+
+def test_an_empty_batch_is_an_empty_list():
+    assert client.post("/predict/batch", json={"points": []}).json() == []
