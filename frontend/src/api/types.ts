@@ -91,7 +91,7 @@ export interface StatsDto {
 }
 
 
-export interface TrashPhotoDto {
+export interface FeedItemDto {
   id: number;
   username: string;
   facultyShortCode?: string;
@@ -104,11 +104,13 @@ export interface TrashPhotoDto {
   cleanlinessScore?: number;
   userRating?: number;
   tags?: string;
+  /** The AI inspector's one-line assessment, when it gave one. */
+  description?: string;
   reportedAt: string;
 }
 
 export interface FeedPage {
-  content: TrashPhotoDto[];
+  content: FeedItemDto[];
   totalElements: number;
   totalPages: number;
   number: number;

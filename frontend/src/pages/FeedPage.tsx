@@ -3,7 +3,7 @@ import { api } from "../api/client";
 import { assetUrl, errorMessage } from "../api/http";
 import { useApi } from "../hooks/useApi";
 import { ScoreChip } from "../components/ScoreChip";
-import type { TrashPhotoDto } from "../api/types";
+import type { FeedItemDto } from "../api/types";
 
 const PAGE_SIZE = 12;
 
@@ -61,7 +61,7 @@ export default function FeedPage() {
 
 function FeedResults({ clan, onTotal }: { clan?: string; onTotal: (n: number) => void }) {
   const [pages, setPages] = useState(1);
-  const [photos, setPhotos] = useState<TrashPhotoDto[]>([]);
+  const [photos, setPhotos] = useState<FeedItemDto[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -133,7 +133,7 @@ function FeedResults({ clan, onTotal }: { clan?: string; onTotal: (n: number) =>
   );
 }
 
-function PhotoCard({ photo: p }: { photo: TrashPhotoDto }) {
+function PhotoCard({ photo: p }: { photo: FeedItemDto }) {
   const [imgError, setImgError] = useState(false);
 
   return (

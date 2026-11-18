@@ -4,7 +4,7 @@ import { useApi } from "../hooks/useApi";
 import { api } from "../api/client";
 import { ScoreChip } from "../components/ScoreChip";
 import { WhatsAppReportCTA } from "../components/WhatsAppReportCTA";
-import type { TrashPhotoDto } from "../api/types";
+import type { FeedItemDto } from "../api/types";
 import { assetUrl } from "../api/http";
 
 export default function LandingPage() {
@@ -117,7 +117,7 @@ export default function LandingPage() {
   );
 }
 
-function LandingPhotoCard({ photo: p }: { photo: TrashPhotoDto }) {
+function LandingPhotoCard({ photo: p }: { photo: FeedItemDto }) {
   const [imgError, setImgError] = useState(false);
 
   return (
