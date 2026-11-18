@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 
 /** The crew-facing side of work orders: listing, completing, manual dispatch. */
@@ -39,12 +40,24 @@ public class WorkOrderService {
     public Dtos.WorkOrderDto complete(Long workOrderId) {
         WorkOrder order = workOrders.findById(workOrderId)
                 .orElseThrow(() -> new NotFoundException("Work order", workOrderId));
+        markCompleted(order, clock.instant());
+        return Dtos.of(order);
+    }
+
+    /** Completes the crew job at this hotspot as of {@code at}; the demo history uses this. */
+    @Transactional
+    public void completeAt(Long hotspotId, Instant at) {
+        WorkOrder order = workOrders.findFirstByHotspotIdOrderByCreatedAtDesc(hotspotId)
+                .orElseThrow(() -> new NotFoundException("Work order for hotspot", hotspotId));
+        markCompleted(order, at);
+    }
+
+    private static void markCompleted(WorkOrder order, Instant at) {
         order.setStatus(WorkOrder.Status.COMPLETED);
-        order.setCompletedAt(clock.instant());
+        order.setCompletedAt(at);
         Hotspot hotspot = order.getHotspot();
         hotspot.setStatus(Hotspot.Status.RESOLVED);
-        hotspot.setLastUpdatedAt(clock.instant());
-        return Dtos.of(order);
+        hotspot.setLastUpdatedAt(at);
     }
 
     @Transactional

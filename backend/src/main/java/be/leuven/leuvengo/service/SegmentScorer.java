@@ -16,7 +16,7 @@ import java.util.Collection;
 public final class SegmentScorer {
 
     /** Assumed score of a street nobody has reported on recently. */
-    static final double PRIOR_SCORE = 85;
+    public static final double PRIOR_SCORE = 85;
     /** How many "fresh reports" worth of trust the prior gets. */
     static final double PRIOR_WEIGHT = 1;
     static final Duration HALF_LIFE = Duration.ofHours(24);

@@ -45,10 +45,7 @@ public class PlanonService {
     public WorkOrder dispatch(Hotspot hotspot, Instant at) {
         if (hotspot.getStatus() == Hotspot.Status.DISPATCHED ||
                 hotspot.getStatus() == Hotspot.Status.RESOLVED) {
-            return workOrders.findAll().stream()
-                    .filter(w -> w.getHotspot() != null
-                            && w.getHotspot().getId().equals(hotspot.getId()))
-                    .findFirst()
+            return workOrders.findFirstByHotspotIdOrderByCreatedAtDesc(hotspot.getId())
                     .orElseGet(() -> createOrder(hotspot, at));
         }
         return createOrder(hotspot, at);

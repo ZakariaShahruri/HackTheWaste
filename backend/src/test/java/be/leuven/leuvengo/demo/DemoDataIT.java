@@ -1,0 +1,101 @@
+package be.leuven.leuvengo.demo;
+
+import be.leuven.leuvengo.domain.StreetSegment;
+import be.leuven.leuvengo.domain.WorkOrder;
+import be.leuven.leuvengo.repository.AppUserRepository;
+import be.leuven.leuvengo.repository.FacultyRepository;
+import be.leuven.leuvengo.repository.HotspotRepository;
+import be.leuven.leuvengo.repository.ReportRepository;
+import be.leuven.leuvengo.repository.RewardItemRepository;
+import be.leuven.leuvengo.repository.StreetSegmentRepository;
+import be.leuven.leuvengo.repository.WorkOrderRepository;
+import be.leuven.leuvengo.service.SegmentScorer;
+import be.leuven.leuvengo.service.StatsService;
+import be.leuven.leuvengo.web.dto.Dtos;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
+
+import java.util.List;
+import java.util.stream.StreamSupport;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/** What the dashboards show right after a fresh start, before anyone has reported anything. */
+@SpringBootTest
+@DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
+class DemoDataIT {
+
+    @Autowired DemoDataSeeder seeder;
+    @Autowired FacultyRepository faculties;
+    @Autowired StreetSegmentRepository segments;
+    @Autowired RewardItemRepository rewards;
+    @Autowired ReportRepository reports;
+    @Autowired HotspotRepository hotspots;
+    @Autowired WorkOrderRepository workOrders;
+    @Autowired AppUserRepository users;
+    @Autowired StatsService stats;
+    @Autowired JsonMapper json;
+
+    @Test
+    void cleanupCrewsHaveWorkOrdersInEveryState() {
+        assertThat(workOrders.findAll())
+                .hasSizeBetween(6, 8)
+                .extracting(WorkOrder::getStatus)
+                .contains(WorkOrder.Status.DISPATCHED, WorkOrder.Status.COMPLETED);
+    }
+
+    @Test
+    void streetScoresRangeFromFilthyToCleanerThanThePrior() {
+        List<Double> scores = segments.findAll().stream().map(StreetSegment::getAiCleanlinessScore).toList();
+
+        assertThat(scores).anySatisfy(s -> assertThat(s).isLessThan(40));
+        assertThat(scores).anySatisfy(s -> assertThat(s).isGreaterThan(SegmentScorer.PRIOR_SCORE));
+    }
+
+    @Test
+    void theWeeklyTrendHasUpsAndDowns() {
+        List<Long> counts = stats.snapshot().reportsLast7Days().stream().map(Dtos.TimeBucket::count).toList();
+
+        assertThat(counts).filteredOn(c -> c > 0).hasSizeGreaterThanOrEqualTo(5);
+        assertThat(counts.stream().distinct()).hasSizeGreaterThan(2);
+    }
+
+    @Test
+    @Transactional
+    void everyStreetCountsForTheClanWhoseTerritoryItLiesIn() {
+        assertThat(segments.findAll()).allSatisfy(street -> assertThat(
+                territoryContains(street.getFaculty().getTerritoryGeoJson(), street.getCenterLat(), street.getCenterLng()))
+                .as("%s in %s", street.getName(), street.getFaculty().getShortCode())
+                .isTrue());
+    }
+
+    @Test
+    void seedingAgainAddsNothing() {
+        List<Long> before = counts();
+
+        seeder.afterSingletonsInstantiated();
+
+        assertThat(counts()).isEqualTo(before);
+    }
+
+    private List<Long> counts() {
+        return List.of(faculties.count(), segments.count(), rewards.count(), reports.count(),
+                hotspots.count(), workOrders.count(), users.count());
+    }
+
+    /** Checks against the stored GeoJSON (what the map draws), not the seeder's own data. */
+    private boolean territoryContains(String geoJson, double lat, double lng) {
+        List<JsonNode> ring = StreamSupport.stream(json.readTree(geoJson).at("/coordinates/0").spliterator(), false)
+                .toList();
+        double lngMin = ring.stream().mapToDouble(p -> p.get(0).asDouble()).min().orElseThrow();
+        double lngMax = ring.stream().mapToDouble(p -> p.get(0).asDouble()).max().orElseThrow();
+        double latMin = ring.stream().mapToDouble(p -> p.get(1).asDouble()).min().orElseThrow();
+        double latMax = ring.stream().mapToDouble(p -> p.get(1).asDouble()).max().orElseThrow();
+        return lat >= latMin && lat <= latMax && lng >= lngMin && lng <= lngMax;
+    }
+}

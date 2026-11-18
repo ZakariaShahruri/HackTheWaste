@@ -28,8 +28,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Transactional
 class ReportPipelineIT {
 
-    private static final double LAT = 50.8525;
-    private static final double LNG = 4.6720;
+    private static final double LAT = 50.8775;
+    private static final double LNG = 4.6735;
 
     @Autowired ReportService reportService;
     @Autowired StreetSegmentRepository segments;
