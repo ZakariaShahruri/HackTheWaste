@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useApi } from "../hooks/useApi";
 import { api } from "../api/client";
 import { ScoreChip } from "../components/ScoreChip";
+import { WhatsAppReportCTA } from "../components/WhatsAppReportCTA";
 import type { TrashPhotoDto } from "../api/types";
 
 export default function LandingPage() {
@@ -30,6 +31,7 @@ export default function LandingPage() {
           <br />A cleaner Leuven.
         </h1>
         <p>Cleanliness signals from the street, dispatched to the right Planon crew.</p>
+        <WhatsAppReportCTA variant="inline" className="landing-hero-cta" />
       </section>
 
       <section className="landing-stats card">

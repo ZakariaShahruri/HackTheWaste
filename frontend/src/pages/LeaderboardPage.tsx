@@ -16,7 +16,7 @@ export default function LeaderboardPage() {
           </div>
         </div>
         <Link to="/report" className="btn btn-accent btn-sm">
-          + Score for your clan
+          📱 Report on WhatsApp
         </Link>
       </div>
 

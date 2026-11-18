@@ -8,9 +8,13 @@ import LeaderboardPage from "./pages/LeaderboardPage";
 import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import FeedPage from "./pages/FeedPage";
+import ReportPage from "./pages/ReportPage";
 import { TopBar } from "./components/TopBar";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
+
+const HIDE_FLOATING_WHATSAPP = ["/report", "/login", "/signup"];
 
 export default function App() {
   const location = useLocation();
@@ -27,6 +31,7 @@ path.startsWith("/market") ||
     <AuthProvider>
       <div className={`app-shell ${themeClass}`}>
         <TopBar />
+        {!HIDE_FLOATING_WHATSAPP.includes(path) && <WhatsAppFloatingButton />}
         <main style={{ flex: 1 }}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
@@ -36,6 +41,7 @@ path.startsWith("/market") ||
             <Route path="/student/leaderboard" element={<LeaderboardPage />} />
             <Route path="/market" element={<MarketplacePage />} />
             <Route path="/feed" element={<FeedPage />} />
+            <Route path="/report" element={<ReportPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="*" element={<Navigate to="/" />} />
