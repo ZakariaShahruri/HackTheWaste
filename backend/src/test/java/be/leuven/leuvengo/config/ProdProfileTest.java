@@ -23,8 +23,22 @@ class ProdProfileTest {
     }
 
     @Test
-    void prodUsesTheConfiguredOrigins() {
+    void prodRefusesToStartWithoutAPseudonymSecret() {
         runner.withPropertyValues("ALLOWED_ORIGINS=https://leuvengo.example")
+                .run(ctx -> assertThat(ctx).hasFailed()
+                        .getFailure().hasStackTraceContaining("PSEUDONYM_SECRET"));
+    }
+
+    @Test
+    void prodRejectsAShortPseudonymSecret() {
+        runner.withPropertyValues("ALLOWED_ORIGINS=https://leuvengo.example", "PSEUDONYM_SECRET=short")
+                .run(ctx -> assertThat(ctx).hasFailed());
+    }
+
+    @Test
+    void prodUsesTheConfiguredOrigins() {
+        runner.withPropertyValues("ALLOWED_ORIGINS=https://leuvengo.example",
+                        "PSEUDONYM_SECRET=a-long-enough-prod-secret")
                 .run(ctx -> assertThat(ctx.getBean(LeuvenGoProperties.class).cors().allowedOrigins())
                         .containsExactly("https://leuvengo.example"));
     }

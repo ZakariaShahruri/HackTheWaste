@@ -43,5 +43,7 @@ leuvengo:
   storage:
     azure-connection-string: ${AZURE_STORAGE_CONNECTION_STRING:}
     azure-container: ${AZURE_STORAGE_CONTAINER:trash-photos}
+  security:
+    pseudonym-secret: ${PSEUDONYM_SECRET:dev-only-pseudonym-secret}
   ml:
     api-url: ${ML_API_URL:http://localhost:8000}

@@ -21,3 +21,6 @@ leuvengo:
     # No fallback on purpose: a prod deploy without ALLOWED_ORIGINS should fail
     # at startup rather than silently block every browser request.
     allowed-origins: ${ALLOWED_ORIGINS}
+  security:
+    # Also required: changing it later orphans every existing pseudonym.
+    pseudonym-secret: ${PSEUDONYM_SECRET}

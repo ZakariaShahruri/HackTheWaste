@@ -74,7 +74,12 @@ public record LeuvenGoProperties(
 
     public record Security(
             /** How long a login stays valid. */
-            @DefaultValue("7d") Duration sessionTtl) {}
+            @DefaultValue("7d") Duration sessionTtl,
+            /** HMAC key for phone-number pseudonyms. Must be set (and kept stable) in prod. */
+            @DefaultValue("dev-only-pseudonym-secret")
+            @Pattern(regexp = "(?!\\$\\{).{16,}",
+                    message = "must be at least 16 characters (is PSEUDONYM_SECRET set?)")
+            String pseudonymSecret) {}
 
     /** Demo-instance conveniences (seed data, a public crew login). */
     public record Demo(
