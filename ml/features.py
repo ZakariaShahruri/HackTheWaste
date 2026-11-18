@@ -6,6 +6,7 @@ go through build_features, so the two can't drift apart.
 import numpy as np
 import pandas as pd
 
+LEUVEN_TZ = "Europe/Brussels"
 LEUVEN_CENTER = (50.8798, 4.7005)
 
 HOTSPOTS = {
@@ -34,11 +35,21 @@ def haversine_km(lat1, lng1, lat2, lng2):
     return 6371.0 * 2 * np.arcsin(np.sqrt(np.clip(a, 0, 1)))
 
 
+def leuven_times(times) -> pd.DatetimeIndex:
+    """
+    Leuven wall-clock times, which is what the hour and weekday features mean.
+    Times with an offset are converted; times without one are taken to be
+    Leuven time already.
+    """
+    stamps = (pd.Timestamp(t) for t in times)
+    return pd.DatetimeIndex([t.tz_convert(LEUVEN_TZ).tz_localize(None) if t.tzinfo else t for t in stamps])
+
+
 def build_features(lats, lngs, times) -> np.ndarray:
-    """One row per point, columns in FEATURE_NAMES order. `times` are Leuven local times."""
+    """One row per point, columns in FEATURE_NAMES order. `times` may be strings or datetimes."""
     lats = np.asarray(lats, dtype=float)
     lngs = np.asarray(lngs, dtype=float)
-    times = pd.DatetimeIndex(times)
+    times = leuven_times(times)
     hour = times.hour.to_numpy()
     dow = times.dayofweek.to_numpy()  # 0 = Monday
 

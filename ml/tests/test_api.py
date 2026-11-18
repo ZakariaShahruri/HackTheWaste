@@ -59,3 +59,11 @@ def test_a_batch_scores_each_point_like_a_single_prediction():
 
 def test_an_empty_batch_is_an_empty_list():
     assert client.post("/predict/batch", json={"points": []}).json() == []
+
+
+def test_a_utc_time_is_scored_as_the_same_moment_in_leuven():
+    def likelihood(time):
+        return client.post("/predict", json={"latitude": 50.8793, "longitude": 4.7005, "time": time}).json()["likelihood"]
+
+    assert likelihood("2026-11-21T22:00:00Z") == likelihood("2026-11-21T23:00:00")
+    assert likelihood("2026-11-21T22:00:00Z") != likelihood("2026-11-21T22:00:00")

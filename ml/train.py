@@ -35,8 +35,7 @@ def main():
     df.columns = [c.lower() for c in df.columns]
     print(f"Loaded {len(df)} rows from {csv_path}")
 
-    times = pd.to_datetime(df["time"], utc=True).dt.tz_convert("Europe/Brussels")
-    X = build_features(df["latitude"], df["longitude"], times)
+    X = build_features(df["latitude"], df["longitude"], df["time"])
     y = df["likelihood"].values
 
     X_train, X_test, y_train, y_test = train_test_split(
