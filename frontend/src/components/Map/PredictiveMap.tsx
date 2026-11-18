@@ -9,38 +9,13 @@ import {
   LEUVEN_MIN_ZOOM,
 } from "./leafletSetup";
 import { PredictiveHeatmapLayer } from "./PredictiveHeatmapLayer";
-import type { PredictPoint } from "../../api/types";
+import { api } from "../../api/client";
 
-const ML_URL = import.meta.env.VITE_ML_URL ?? "/ml";
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-function toIso(dayOffset: number, hour: number): string {
-  const d = new Date();
-  const currentDow = (d.getDay() + 6) % 7; // 0 = Mon
-  d.setDate(d.getDate() + ((dayOffset - currentDow + 7) % 7));
-  d.setHours(hour, 0, 0, 0);
-  return (
-    d.getFullYear() +
-    "-" + String(d.getMonth() + 1).padStart(2, "0") +
-    "-" + String(d.getDate()).padStart(2, "0") +
-    "T" + String(hour).padStart(2, "0") + ":00:00"
-  );
-}
+const GRID_STEPS = 35;
 
 interface Props {
   height?: number;
-}
-
-async function fetchPredictionGrid(day: number, hour: number, signal: AbortSignal) {
-  const res = await fetch(`${ML_URL}/predict/grid`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ time: toIso(day, hour), lat_steps: 35, lng_steps: 35 }),
-    signal,
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = (await res.json()) as { points?: PredictPoint[] };
-  return data.points ?? [];
 }
 
 export function PredictiveMap({ height = 540 }: Props) {
@@ -48,12 +23,12 @@ export function PredictiveMap({ height = 540 }: Props) {
   const [day, setDay]   = useState(today);
   const [hour, setHour] = useState(new Date().getHours());
   const prediction = useApi(
-    (signal) => fetchPredictionGrid(day, hour, signal),
+    (signal) => api.predictGrid(day, hour, GRID_STEPS, signal),
     { key: `${day}:${hour}` },
   );
-  const points = prediction.data ?? [];
+  const points = prediction.data?.points ?? [];
   const loading = prediction.loading;
-  const mlOffline = prediction.error !== null;
+  const mlOffline = prediction.error !== null || prediction.data?.available === false;
 
   const peak = points.length ? Math.max(...points.map((p) => p.likelihood)) : 0;
   const peakPct = Math.round(peak * 100);
@@ -97,7 +72,7 @@ export function PredictiveMap({ height = 540 }: Props) {
               <span className="predictive-loading">Predicting…</span>
             ) : mlOffline ? (
               <span className="predictive-error">
-                ML server offline — start it first
+                Predictions are offline right now
               </span>
             ) : (
               <span>

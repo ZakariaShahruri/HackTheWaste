@@ -133,3 +133,11 @@ export interface PredictPoint {
   lng: number;
   likelihood: number;
 }
+
+export interface PredictionGrid {
+  /** Leuven local time the grid is for. */
+  at: string;
+  /** False when the ML service is down; `points` is then empty. */
+  available: boolean;
+  points: PredictPoint[];
+}

@@ -5,7 +5,7 @@ import type {
   FeedPage,
   HotspotDto,
   LeaderboardEntry,
-  PredictPoint,
+  PredictionGrid,
   RewardItemDto,
   StatsDto,
   StreetSegmentDto,
@@ -41,8 +41,9 @@ export const api = {
     return request<FeedPage>(`/feed?${params}`, { signal });
   },
 
-  predictGrid: (at: string, steps = 30, signal?: Signal) => {
-    const params = new URLSearchParams({ at, steps: String(steps) });
-    return request<PredictPoint[]>(`/predictions/grid?${params}`, { signal });
+  /** `day` 0 = Monday; the backend resolves it to the coming date in Leuven time. */
+  predictGrid: (day: number, hour: number, steps: number, signal?: Signal) => {
+    const params = new URLSearchParams({ day: String(day), hour: String(hour), steps: String(steps) });
+    return request<PredictionGrid>(`/predictions/grid?${params}`, { signal });
   },
 };
