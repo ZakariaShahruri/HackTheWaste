@@ -40,9 +40,11 @@ flowchart LR
 2. **Check.** The photo is re-encoded to a JPEG of at most 1280 px, which also
    drops EXIF data such as GPS. Gemini scores it from 0 (filthy) to 100 (clean)
    and rejects screenshots and stock photos. Pins outside Leuven are refused.
-3. **Cluster.** A report within 40 m of an open hotspot joins it; otherwise it
-   opens a new one. At 3 reports the hotspot escalates to a work order whose
-   priority depends on how dirty the spot is and how many people reported it.
+3. **Cluster.** A report within 40 m of a hotspot that hasn't been cleaned up
+   yet joins it; otherwise it opens a new one. At 3 reports the hotspot
+   escalates to a work order whose priority depends on how dirty the spot is
+   and how many people reported it. Later reports there join the same order
+   until a crew marks it done.
 4. **Score.** Each street segment's score is a recency-weighted average of the
    reports within 80 m, pulled towards a neutral prior so that one photo can't
    swing a street to 0 or 100:

@@ -28,8 +28,6 @@ public class HotspotController {
 
     @GetMapping("/active")
     public List<Dtos.HotspotDto> active() {
-        return hotspots.findAllByStatusIn(List.of(
-                Hotspot.Status.OPEN, Hotspot.Status.ESCALATED, Hotspot.Status.DISPATCHED))
-                .stream().map(Dtos::of).toList();
+        return hotspots.findAllByStatusIn(Hotspot.ACTIVE).stream().map(Dtos::of).toList();
     }
 }

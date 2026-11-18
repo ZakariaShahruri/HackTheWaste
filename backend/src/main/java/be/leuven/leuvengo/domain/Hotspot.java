@@ -2,12 +2,16 @@ package be.leuven.leuvengo.domain;
 
 import jakarta.persistence.*;
 import java.time.Instant;
+import java.util.Set;
 
 @Entity
 @Table(name = "hotspot")
 public class Hotspot {
 
     public enum Status { OPEN, ESCALATED, DISPATCHED, RESOLVED }
+
+    /** Not cleaned up yet: new reports nearby join these instead of opening a new hotspot. */
+    public static final Set<Status> ACTIVE = Set.of(Status.OPEN, Status.ESCALATED, Status.DISPATCHED);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

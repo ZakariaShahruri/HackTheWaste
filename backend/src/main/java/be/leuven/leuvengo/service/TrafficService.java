@@ -10,13 +10,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 
 /**
  * Traffic Logic: collapse multiple reports in the same vicinity into a single Hotspot
- * to prevent duplicate Planon work orders. Pure proximity clustering against open
- * hotspots, weighted by recency.
+ * to prevent duplicate Planon work orders. Pure proximity clustering against hotspots
+ * that haven't been cleaned up yet.
  */
 @Service
 public class TrafficService {
@@ -39,12 +38,9 @@ public class TrafficService {
      */
     @Transactional
     public Hotspot ingest(Report report) {
-        List<Hotspot> open = hotspots.findAllByStatusIn(
-                List.of(Hotspot.Status.OPEN, Hotspot.Status.ESCALATED));
-
         Hotspot best = null;
         double bestDist = Double.MAX_VALUE;
-        for (Hotspot h : open) {
+        for (Hotspot h : hotspots.findAllByStatusIn(Hotspot.ACTIVE)) {
             double d = GeoUtil.distanceMeters(
                     report.getLat(), report.getLng(), h.getCenterLat(), h.getCenterLng());
             if (d <= props.traffic().clusterRadiusM() && d < bestDist) {

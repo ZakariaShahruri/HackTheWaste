@@ -55,6 +55,21 @@ class ReportPipelineIT {
     }
 
     @Test
+    void reportsAtADispatchedSpotJoinItInsteadOfOrderingASecondCrew() {
+        submit(10);
+        submit(15);
+        Hotspot dispatched = submit(5).getHotspot();
+
+        Report fourth = submit(20);
+
+        assertThat(fourth.getHotspot()).isSameAs(dispatched);
+        assertThat(dispatched.getReportCount()).isEqualTo(4);
+        assertThat(workOrders.findAll())
+                .filteredOn(w -> w.getHotspot().getId().equals(dispatched.getId()))
+                .hasSize(1);
+    }
+
+    @Test
     void filthyReportsLowerTheStreetScore() {
         StreetSegment street = gasthuisberg();
         double before = street.getAiCleanlinessScore();
