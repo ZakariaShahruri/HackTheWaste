@@ -15,6 +15,9 @@ import be.leuven.leuvengo.web.dto.Dtos;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -24,12 +27,19 @@ import java.util.List;
 import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /** What the dashboards show right after a fresh start, before anyone has reported anything. */
 @SpringBootTest
+@AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.BEFORE_CLASS)
 class DemoDataIT {
 
+    @Autowired MockMvc mvc;
     @Autowired DemoDataSeeder seeder;
     @Autowired FacultyRepository faculties;
     @Autowired StreetSegmentRepository segments;
@@ -72,6 +82,19 @@ class DemoDataIT {
                 territoryContains(street.getFaculty().getTerritoryGeoJson(), street.getCenterLat(), street.getCenterLng()))
                 .as("%s in %s", street.getName(), street.getFaculty().getShortCode())
                 .isTrue());
+    }
+
+    @Test
+    void theFeedOpensWithPhotosThatLoad() throws Exception {
+        mvc.perform(get("/api/feed"))
+                .andExpect(jsonPath("$.totalElements", greaterThanOrEqualTo(DemoActivity.PHOTO_REPORTS)))
+                .andExpect(jsonPath("$.content[0].username").value("Leuven Go demo"));
+
+        String photoUrl = reports.findByPhotoUrlIsNotNullOrderByReportedAtDesc(
+                PageRequest.of(0, 1)).getContent().getFirst().getPhotoUrl();
+        mvc.perform(get(photoUrl))
+                .andExpect(status().isOk())
+                .andExpect(content().contentType("image/jpeg"));
     }
 
     @Test

@@ -51,6 +51,20 @@ class DemoActivityTest {
                 .allSatisfy(r -> assertThat(r.at()).isBefore(cleanup.at())));
     }
 
+    @Test
+    void theNewestSpotReportsComeWithAPhotoAndDescription() {
+        List<DemoActivity.Report> withPhoto = reports().stream().filter(DemoActivity.Report::photo).toList();
+        Instant oldestPhoto = withPhoto.getFirst().at();
+
+        assertThat(withPhoto).hasSize(DemoActivity.PHOTO_REPORTS).allSatisfy(r -> {
+            assertThat(r.spot()).isNotNull();
+            assertThat(r.description()).isNotBlank();
+        });
+        assertThat(reports())
+                .filteredOn(r -> r.spot() != null && r.at().isAfter(oldestPhoto))
+                .allMatch(DemoActivity.Report::photo);
+    }
+
     private static List<DemoActivity.Report> reports() {
         return WEEK.stream()
                 .filter(DemoActivity.Report.class::isInstance).map(DemoActivity.Report.class::cast).toList();

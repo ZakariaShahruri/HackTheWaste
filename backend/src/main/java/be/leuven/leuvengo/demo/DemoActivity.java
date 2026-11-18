@@ -26,6 +26,7 @@ final class DemoActivity {
     private static final double SPREAD_M = 12;
     private static final double SCORE_SPREAD = 8;
     private static final int SCATTERED_REPORTS = 10;
+    static final int PHOTO_REPORTS = 14;
     private static final GeoBox CENTRE = new GeoBox(50.872, 50.886, 4.692, 4.716);
     private static final List<String> SCATTERED_TAGS =
             List.of("plastic", "paper", "cigarettes", "glass", "food_waste");
@@ -42,9 +43,17 @@ final class DemoActivity {
         Instant at();
     }
 
-    /** {@code spot} is null for scattered one-off reports. */
+    /**
+     * {@code spot} is null for scattered one-off reports. {@code description} is what
+     * the AI would say about the photo, so it only shows up on photo reports.
+     */
     record Report(Instant at, String spot, double lat, double lng, int score, String clan,
-                  String reporterId, List<String> tags, String description) implements Event {}
+                  String reporterId, List<String> tags, String description, boolean photo) implements Event {
+
+        Report withPhoto() {
+            return new Report(at, spot, lat, lng, score, clan, reporterId, tags, description, true);
+        }
+    }
 
     /** A crew finishes the work order at this spot. */
     record Cleanup(Instant at, String spot) implements Event {}
@@ -90,7 +99,7 @@ final class DemoActivity {
                 double lng = street.lng() + rnd.nextGaussian() * SPREAD_M / metersPerDegreeLng(street.lat());
                 events.add(new Report(hoursAgo(now, reportHoursAgo(spot, i), rnd), spot.street(), lat, lng,
                         score(spot.meanScore(), rnd), clan(lat, lng, rnd), reporter(rnd),
-                        spot.tags(), spot.descriptions().get(rnd.nextInt(spot.descriptions().size()))));
+                        spot.tags(), spot.descriptions().get(rnd.nextInt(spot.descriptions().size())), false));
             }
             if (spot.cleanedHoursAgo() != null) {
                 events.add(new Cleanup(now.minus(Duration.ofHours(spot.cleanedHoursAgo())), spot.street()));
@@ -102,10 +111,23 @@ final class DemoActivity {
             Instant at = now.minus(Duration.ofMinutes(30 + rnd.nextLong(SPAN.toMinutes() - 60)));
             String tag = SCATTERED_TAGS.get(rnd.nextInt(SCATTERED_TAGS.size()));
             events.add(new Report(at, null, lat, lng, 45 + rnd.nextInt(46), clan(lat, lng, rnd),
-                    reporter(rnd), List.of(tag), null));
+                    reporter(rnd), List.of(tag), null, false));
         }
         events.sort(Comparator.comparing(Event::at));
-        return events;
+        return withPhotos(events);
+    }
+
+    /** The newest reports at the known spots come with a photo, so the feed looks current. */
+    private static List<Event> withPhotos(List<Event> events) {
+        List<Event> result = new ArrayList<>(events);
+        int left = PHOTO_REPORTS;
+        for (int i = result.size() - 1; i >= 0 && left > 0; i--) {
+            if (result.get(i) instanceof Report r && r.spot() != null) {
+                result.set(i, r.withPhoto());
+                left--;
+            }
+        }
+        return result;
     }
 
     /** Spread evenly from the first to the last report time. */

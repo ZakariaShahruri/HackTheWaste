@@ -45,8 +45,12 @@ public class ImageNormalizer {
     }
 
     public Normalized normalize(byte[] input) throws UnreadableImageException {
-        BufferedImage decoded = decode(input);
-        BufferedImage scaled = toRgbWithin(decoded, MAX_EDGE);
+        return normalize(decode(input));
+    }
+
+    /** For images drawn by the app itself, which need no decoding. */
+    public Normalized normalize(BufferedImage image) {
+        BufferedImage scaled = toRgbWithin(image, MAX_EDGE);
         return new Normalized(encodeJpeg(scaled), scaled.getWidth(), scaled.getHeight());
     }
 
