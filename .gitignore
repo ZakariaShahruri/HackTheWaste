@@ -16,10 +16,6 @@ backend/.mvn
 *.iml
 *.swp
 
-# infra secrets
-infra/postgresql.bicepparam
-infra/main.bicepparam
-
 # local secrets
 .env
 backend/src/main/resources/application-local.yml
