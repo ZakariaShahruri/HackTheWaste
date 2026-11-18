@@ -11,6 +11,9 @@ public interface PhotoStorage {
      */
     String store(ImageNormalizer.Normalized photo, String ownerId);
 
+    /** Removes a photo by the URL {@link #store} returned; unknown URLs are ignored. */
+    void delete(String url);
+
     /** Short name for startup logs, e.g. "database". */
     String describe();
 }

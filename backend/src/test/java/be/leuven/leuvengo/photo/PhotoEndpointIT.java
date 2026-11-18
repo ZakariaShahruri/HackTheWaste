@@ -38,6 +38,16 @@ class PhotoEndpointIT {
     }
 
     @Test
+    void deletedPhotosAreGoneAndForeignUrlsAreIgnored() throws Exception {
+        String url = storage.store(images.normalize(TestImages.jpeg(64, 48)), "wa-test");
+
+        storage.delete("https://elsewhere.example/photo.jpg");
+        storage.delete(url);
+
+        mvc.perform(get(url)).andExpect(status().isNotFound());
+    }
+
+    @Test
     void unknownOrMalformedIdsAre404() throws Exception {
         mvc.perform(get("/api/photos/00000000-0000-0000-0000-000000000000")).andExpect(status().isNotFound());
         mvc.perform(get("/api/photos/../../etc")).andExpect(status().isNotFound());

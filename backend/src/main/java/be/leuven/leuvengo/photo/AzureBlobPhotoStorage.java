@@ -3,6 +3,7 @@ package be.leuven.leuvengo.photo;
 import com.azure.storage.blob.BlobClient;
 import com.azure.storage.blob.BlobContainerClient;
 import com.azure.storage.blob.BlobServiceClientBuilder;
+import com.azure.storage.blob.BlobUrlParts;
 import com.azure.storage.blob.models.BlobHttpHeaders;
 
 import java.io.ByteArrayInputStream;
@@ -32,6 +33,14 @@ public class AzureBlobPhotoStorage implements PhotoStorage {
         blob.upload(new ByteArrayInputStream(photo.bytes()), photo.bytes().length, true);
         blob.setHttpHeaders(new BlobHttpHeaders().setContentType(photo.contentType()));
         return blob.getBlobUrl();
+    }
+
+    @Override
+    public void delete(String url) {
+        BlobUrlParts parts = BlobUrlParts.parse(url);
+        if (container.getBlobContainerName().equals(parts.getBlobContainerName())) {
+            container.getBlobClient(parts.getBlobName()).deleteIfExists();
+        }
     }
 
     @Override

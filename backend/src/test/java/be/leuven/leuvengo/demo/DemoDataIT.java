@@ -1,7 +1,12 @@
 package be.leuven.leuvengo.demo;
 
+import be.leuven.leuvengo.domain.Faculty;
+import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.domain.StreetSegment;
 import be.leuven.leuvengo.domain.WorkOrder;
+import be.leuven.leuvengo.photo.ImageNormalizer;
+import be.leuven.leuvengo.photo.PhotoStorage;
+import be.leuven.leuvengo.photo.StoredPhotoRepository;
 import be.leuven.leuvengo.repository.AppUserRepository;
 import be.leuven.leuvengo.repository.FacultyRepository;
 import be.leuven.leuvengo.repository.HotspotRepository;
@@ -9,8 +14,12 @@ import be.leuven.leuvengo.repository.ReportRepository;
 import be.leuven.leuvengo.repository.RewardItemRepository;
 import be.leuven.leuvengo.repository.StreetSegmentRepository;
 import be.leuven.leuvengo.repository.WorkOrderRepository;
+import be.leuven.leuvengo.service.PointsPolicy;
+import be.leuven.leuvengo.service.ReportService;
+import be.leuven.leuvengo.service.Reporter;
 import be.leuven.leuvengo.service.SegmentScorer;
 import be.leuven.leuvengo.service.StatsService;
+import be.leuven.leuvengo.support.TestImages;
 import be.leuven.leuvengo.web.dto.Dtos;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +59,11 @@ class DemoDataIT {
     @Autowired AppUserRepository users;
     @Autowired StatsService stats;
     @Autowired JsonMapper json;
+    @Autowired DemoReset reset;
+    @Autowired ReportService reportService;
+    @Autowired PhotoStorage photoStorage;
+    @Autowired ImageNormalizer images;
+    @Autowired StoredPhotoRepository storedPhotos;
 
     @Test
     void cleanupCrewsHaveWorkOrdersInEveryState() {
@@ -104,6 +118,23 @@ class DemoDataIT {
         seeder.afterSingletonsInstantiated();
 
         assertThat(counts()).isEqualTo(before);
+    }
+
+    @Test
+    void theNightlyResetClearsUploadsAndStartsAFreshWeek() throws Exception {
+        List<Long> fresh = counts();
+        String upload = photoStorage.store(images.normalize(TestImages.jpeg(64, 48)), "web-test");
+        reportService.submit(new ReportService.Submission(50.8775, 4.6735, 10, Report.Source.WEB,
+                Reporter.anonymous("web-test", "PSY"), new ReportService.Evidence(upload, List.of(), null, null)));
+
+        reset.reset();
+
+        assertThat(counts()).isEqualTo(fresh);
+        assertThat(reports.findAllPhotoUrls())
+                .doesNotContain(upload)
+                .hasSize((int) storedPhotos.count());
+        assertThat(faculties.findAll().stream().mapToInt(Faculty::getPoints).sum())
+                .isEqualTo(reports.findAll().stream().mapToInt(r -> PointsPolicy.pointsFor(r.getCleanlinessScore())).sum());
     }
 
     private List<Long> counts() {

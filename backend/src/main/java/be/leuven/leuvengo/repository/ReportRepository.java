@@ -14,6 +14,9 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
 
     List<Report> findByReportedAtGreaterThanEqual(Instant since);
 
+    @Query("select r.photoUrl from Report r where r.photoUrl is not null")
+    List<String> findAllPhotoUrls();
+
     /** The public feed: photo reports, newest first. */
     @EntityGraph(attributePaths = {"creditedFaculty", "hotspot.streetSegment"})
     Page<Report> findByPhotoUrlIsNotNullOrderByReportedAtDesc(Pageable page);

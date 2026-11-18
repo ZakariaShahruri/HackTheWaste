@@ -27,6 +27,14 @@ public class DatabasePhotoStorage implements PhotoStorage {
         return PATH_PREFIX + id;
     }
 
+    @Override
+    @Transactional
+    public void delete(String url) {
+        if (url != null && url.startsWith(PATH_PREFIX)) {
+            photos.deleteById(url.substring(PATH_PREFIX.length()));
+        }
+    }
+
     @Transactional(readOnly = true)
     public Optional<StoredPhoto> find(String id) {
         return photos.findById(id);
