@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useApi } from "../../hooks/useApi";
-import { MapContainer, TileLayer, ScaleControl } from "react-leaflet";
+import { MapContainer, ScaleControl } from "react-leaflet";
 import "./leafletSetup";
 import {
   LEUVEN_BOUNDS,
@@ -10,6 +10,7 @@ import {
 } from "./leafletSetup";
 import { PredictiveHeatmapLayer } from "./PredictiveHeatmapLayer";
 import { api } from "../../api/client";
+import { BaseTiles } from "./BaseTiles";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const GRID_STEPS = 35;
@@ -95,12 +96,7 @@ export function PredictiveMap({ height = 540 }: Props) {
           scrollWheelZoom
           style={{ height: "100%", width: "100%" }}
         >
-          <TileLayer
-            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO'
-            subdomains="abcd"
-            maxZoom={LEUVEN_MAX_ZOOM}
-          />
+          <BaseTiles />
           <ScaleControl position="bottomleft" imperial={false} />
           {!mlOffline && <PredictiveHeatmapLayer points={points} />}
         </MapContainer>

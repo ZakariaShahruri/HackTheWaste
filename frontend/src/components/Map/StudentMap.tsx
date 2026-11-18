@@ -5,7 +5,6 @@ import {
   Polygon,
   Popup,
   ScaleControl,
-  TileLayer,
   Tooltip,
 } from "react-leaflet";
 import "./leafletSetup";
@@ -20,6 +19,7 @@ import type {
   HotspotDto,
   StreetSegmentDto,
 } from "../../api/types";
+import { BaseTiles } from "./BaseTiles";
 
 interface Props {
   faculties: FacultyDto[];
@@ -82,12 +82,7 @@ export function StudentMap({
         scrollWheelZoom
         style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO'
-          subdomains="abcd"
-          maxZoom={LEUVEN_MAX_ZOOM}
-        />
+        <BaseTiles />
         <ScaleControl position="bottomleft" imperial={false} />
 
         {territories.map(({ faculty, coords }) => {

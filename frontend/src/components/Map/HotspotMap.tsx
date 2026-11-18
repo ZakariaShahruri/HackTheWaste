@@ -3,7 +3,6 @@ import {
   MapContainer,
   Popup,
   ScaleControl,
-  TileLayer,
 } from "react-leaflet";
 import "./leafletSetup";
 import {
@@ -13,6 +12,7 @@ import {
   LEUVEN_MIN_ZOOM,
 } from "./leafletSetup";
 import type { HotspotDto } from "../../api/types";
+import { BaseTiles } from "./BaseTiles";
 
 interface Props {
   hotspots: HotspotDto[];
@@ -39,12 +39,7 @@ export function HotspotMap({ hotspots, height = 520 }: Props) {
         scrollWheelZoom
         style={{ height: "100%", width: "100%" }}
       >
-        <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CARTO'
-          subdomains="abcd"
-          maxZoom={LEUVEN_MAX_ZOOM}
-        />
+        <BaseTiles />
         <ScaleControl position="bottomleft" imperial={false} />
         {hotspots.map((h) => {
           const radius = Math.min(28, 10 + (h.reportCount ?? 1) * 3);
