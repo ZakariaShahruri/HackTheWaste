@@ -1,6 +1,7 @@
 package be.leuven.leuvengo.demo;
 
 import be.leuven.leuvengo.config.LeuvenGoProperties;
+import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.photo.PhotoStorage;
 import be.leuven.leuvengo.repository.FacultyRepository;
 import be.leuven.leuvengo.repository.HotspotRepository;
@@ -13,17 +14,22 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 
 /**
  * Winds a demo instance back to a fresh week every night: public test uploads
  * don't pile up, and the seeded history never ages past the 72-hour scoring
- * window. Accounts, their points and redeemed vouchers are kept.
+ * window. Accounts, their points and redeemed vouchers are kept. Hosts that
+ * sleep when idle (Cloud Run) miss the nightly run, so a start catches up
+ * when the week is more than {@link #MAX_AGE} old.
  */
 @Component
 class DemoReset {
 
     private static final Logger log = LoggerFactory.getLogger(DemoReset.class);
+    static final Duration MAX_AGE = Duration.ofDays(1);
 
     private final ReportRepository reports;
     private final HotspotRepository hotspots;
@@ -33,10 +39,11 @@ class DemoReset {
     private final DemoActivitySeeder activity;
     private final LeuvenGoProperties props;
     private final TransactionTemplate transaction;
+    private final Clock clock;
 
     DemoReset(ReportRepository reports, HotspotRepository hotspots, WorkOrderRepository workOrders,
               FacultyRepository faculties, PhotoStorage photos, DemoActivitySeeder activity,
-              LeuvenGoProperties props, TransactionTemplate transaction) {
+              LeuvenGoProperties props, TransactionTemplate transaction, Clock clock) {
         this.reports = reports;
         this.hotspots = hotspots;
         this.workOrders = workOrders;
@@ -45,11 +52,18 @@ class DemoReset {
         this.activity = activity;
         this.props = props;
         this.transaction = transaction;
+        this.clock = clock;
     }
 
     @Scheduled(cron = "${leuvengo.demo.reset-cron:0 0 4 * * *}", zone = LeuvenTime.ZONE_ID)
     void nightly() {
         if (props.demo().enabled()) reset();
+    }
+
+    boolean isStale() {
+        return reports.findLatestReportedAt(Report.Source.DEMO)
+                .map(latest -> latest.isBefore(clock.instant().minus(MAX_AGE)))
+                .orElse(false);
     }
 
     void reset() {

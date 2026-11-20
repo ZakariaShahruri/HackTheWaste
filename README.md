@@ -124,8 +124,11 @@ of them already cleaned up, a couple of clean streets and scattered one-offs.
 So the dashboards open with work orders in every state, a spread of street
 scores and a feed with photos. Every night at 04:00 (Leuven time) a demo
 instance throws away all reports, hotspots, work orders and photos, uploads
-included, and replays a fresh week, so the history never goes stale. Accounts,
-their points and redeemed vouchers are kept. `LEUVENGO_DEMO_ENABLED=false`
+included, and replays a fresh week, so the history never goes stale. A host
+that sleeps when idle misses that run, so an instance that starts on a week
+more than a day old replays it before serving requests, and street scores are
+recomputed at every start. Accounts, their points and redeemed vouchers are
+kept. `LEUVENGO_DEMO_ENABLED=false`
 turns all of this off and keeps only the clans, streets and rewards.
 
 ```bash

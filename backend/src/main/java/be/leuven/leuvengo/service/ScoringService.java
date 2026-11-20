@@ -5,6 +5,8 @@ import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.domain.StreetSegment;
 import be.leuven.leuvengo.repository.ReportRepository;
 import be.leuven.leuvengo.repository.StreetSegmentRepository;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,9 +58,11 @@ public class ScoringService {
 
     /**
      * Re-scores every segment. Runs hourly so scores relax back towards the
-     * prior as reports age, even when no new reports come in.
+     * prior as reports age, even when no new reports come in, and at startup
+     * because an instance that slept while idle missed those runs.
      */
     @Scheduled(cron = "${leuvengo.scoring.refresh-cron:0 0 * * * *}")
+    @EventListener(ApplicationReadyEvent.class)
     @Transactional
     public void recomputeAll() {
         Instant now = clock.instant();

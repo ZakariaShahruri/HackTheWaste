@@ -9,12 +9,16 @@ import be.leuven.leuvengo.repository.StreetSegmentRepository;
 import be.leuven.leuvengo.repository.WorkOrderRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,6 +41,7 @@ class ReportPipelineIT {
     @Autowired WorkOrderRepository workOrders;
     @Autowired WorkOrderService workOrderService;
     @Autowired Clock clock;
+    @Autowired ConfigurableApplicationContext context;
 
     @Test
     void thirdNearbyReportEscalatesToAPlanonWorkOrder() {
@@ -119,6 +124,17 @@ class ReportPipelineIT {
 
         assertThat(gasthuisberg().getAiCleanlinessScore()).isLessThan(before);
         assertThat(gasthuisberg().getRecentReportCount()).isEqualTo(1);
+    }
+
+    @Test
+    void startupRescoresStreetsThatAgedWhileTheAppSlept() {
+        gasthuisberg().setAiCleanlinessScore(0.0);
+
+        context.publishEvent(new ApplicationReadyEvent(
+                new SpringApplication(), new String[0], context, Duration.ZERO));
+
+        assertThat(gasthuisberg().getAiCleanlinessScore())
+                .isEqualTo(SegmentScorer.score(List.of(), clock.instant()));
     }
 
     @Test

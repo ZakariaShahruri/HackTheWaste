@@ -25,7 +25,7 @@ import java.util.Map;
  * Fills an empty database with the {@link DemoCity} (always: the app needs
  * clans and streets to work) and, on demo instances, a crew login and a week
  * of {@link DemoActivity}. Each part is only added when it's missing, so
- * restarts don't duplicate anything.
+ * restarts don't duplicate anything; a week that has gone stale is replayed.
  */
 @Component
 class DemoDataSeeder implements SmartInitializingSingleton {
@@ -38,6 +38,7 @@ class DemoDataSeeder implements SmartInitializingSingleton {
     private final ReportRepository reports;
     private final WorkOrderRepository workOrders;
     private final DemoActivitySeeder activity;
+    private final DemoReset reset;
     private final AuthService auth;
     private final LeuvenGoProperties props;
     private final TransactionTemplate transaction;
@@ -45,13 +46,14 @@ class DemoDataSeeder implements SmartInitializingSingleton {
 
     DemoDataSeeder(FacultyRepository faculties, StreetSegmentRepository segments, RewardItemRepository rewards,
                    ReportRepository reports, WorkOrderRepository workOrders, DemoActivitySeeder activity,
-                   AuthService auth, LeuvenGoProperties props, TransactionTemplate transaction, Clock clock) {
+                   DemoReset reset, AuthService auth, LeuvenGoProperties props, TransactionTemplate transaction, Clock clock) {
         this.faculties = faculties;
         this.segments = segments;
         this.rewards = rewards;
         this.reports = reports;
         this.workOrders = workOrders;
         this.activity = activity;
+        this.reset = reset;
         this.auth = auth;
         this.props = props;
         this.transaction = transaction;
@@ -80,6 +82,8 @@ class DemoDataSeeder implements SmartInitializingSingleton {
             activity.seed();
             log.info("Seeded a week of demo activity: {} reports, {} work orders",
                     reports.count(), workOrders.count());
+        } else if (reset.isStale()) {
+            reset.reset();
         }
     }
 

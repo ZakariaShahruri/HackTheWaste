@@ -9,10 +9,14 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 public interface ReportRepository extends JpaRepository<Report, Long> {
 
     List<Report> findByReportedAtGreaterThanEqual(Instant since);
+
+    @Query("select max(r.reportedAt) from Report r where r.source = :source")
+    Optional<Instant> findLatestReportedAt(Report.Source source);
 
     @Query("select r.photoUrl from Report r where r.photoUrl is not null")
     List<String> findAllPhotoUrls();

@@ -29,9 +29,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.StreamSupport;
 
@@ -64,6 +66,7 @@ class DemoDataIT {
     @Autowired PhotoStorage photoStorage;
     @Autowired ImageNormalizer images;
     @Autowired StoredPhotoRepository storedPhotos;
+    @Autowired TransactionTemplate transaction;
 
     @Test
     void cleanupCrewsHaveWorkOrdersInEveryState() {
@@ -135,6 +138,23 @@ class DemoDataIT {
                 .hasSize((int) storedPhotos.count());
         assertThat(faculties.findAll().stream().mapToInt(Faculty::getPoints).sum())
                 .isEqualTo(reports.findAll().stream().mapToInt(r -> PointsPolicy.pointsFor(r.getCleanlinessScore())).sum());
+    }
+
+    @Test
+    void aStartAfterADayAsleepReplaysAFreshWeek() {
+        assertThat(reset.isStale()).isFalse();
+        ageEveryReport(DemoReset.MAX_AGE.plusHours(1));
+        assertThat(reset.isStale()).isTrue();
+
+        seeder.afterSingletonsInstantiated();
+
+        assertThat(reset.isStale()).isFalse();
+        assertThat(workOrders.findAll()).extracting(WorkOrder::getStatus).contains(WorkOrder.Status.DISPATCHED);
+    }
+
+    private void ageEveryReport(Duration age) {
+        transaction.executeWithoutResult(status ->
+                reports.findAll().forEach(r -> r.setReportedAt(r.getReportedAt().minus(age))));
     }
 
     private List<Long> counts() {
