@@ -58,7 +58,7 @@ jobs:
       - run: npm test
       - run: npm run build
         env:
-          VITE_API_BASE_URL: https://placeholder.railway.app
+          VITE_API_BASE_URL: https://api.example.com
 
   ml:
     name: ML service (tests)
@@ -76,6 +76,36 @@ jobs:
           cache-dependency-path: ml/requirements*.txt
       - run: pip install -r requirements-dev.txt
       - run: pytest -q
+
+  infra:
+    name: Infrastructure (terraform, budget kill switch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.17.2
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+      - uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.66.0
+      - run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: tflint --format compact
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements.txt pytest==9.2.0
+        working-directory: infra/kill-switch
+      - run: pytest -q
+        working-directory: infra/kill-switch
 
   containers:
     name: Containers (images + compose smoke test)

@@ -1,9 +1,0 @@
-[build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
-
-[deploy]
-healthcheckPath = "/actuator/health"
-# Flyway and the demo seeder run before the app reports healthy
-healthcheckTimeout = 180
-restartPolicyType = "ON_FAILURE"

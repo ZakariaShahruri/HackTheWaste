@@ -110,7 +110,7 @@ flowchart LR
 | `ml/`       | Python 3.13, FastAPI, scikit-learn                                         |
 | AI          | Google Gemini (`gemini-2.5-flash-lite` by default)                         |
 | Messaging   | Twilio WhatsApp                                                            |
-| Hosting     | Vercel (frontend); Railway (backend, ML, Postgres), both built from their Dockerfiles |
+| Hosting     | Vercel (frontend), Google Cloud Run (API, ML), Neon (Postgres); Terraform in `infra/` |
 
 ## Running it locally
 
@@ -186,6 +186,47 @@ The frontend reads `VITE_API_BASE_URL`, `VITE_WHATSAPP_NUMBER` and
 `VITE_WHATSAPP_JOIN_CODE`, plus `SITE_URL` at build time for the absolute
 social preview image URL; Vercel builds use the production URL instead (see
 `frontend/.env.example`).
+
+## Deployment
+
+The frontend runs on Vercel, the API and the ML service on Google Cloud Run
+in `europe-west1` (Belgium), and Postgres on Neon. All of it is described in
+Terraform in `infra/`, including the Vercel project and the Neon database.
+
+It is built to cost nothing at demo traffic and never to surprise anyone with
+a bill:
+
+- Both Cloud Run services scale to zero and are capped at one instance, so a
+  traffic spike queues instead of scaling. A cold start takes a few seconds.
+- The ML service is private: only the API's service account may call it, with
+  a Google-signed ID token.
+- A monthly budget (`monthly_budget`, 1 in the billing account's currency)
+  feeds a small function (`infra/kill-switch`) that unlinks billing from the
+  project once spend passes it. Budget data lags by a few hours, so the worst
+  case is a few dollars, not an open-ended bill.
+- Neon and Vercel run on free plans with no payment method, so they can only
+  pause, not bill.
+
+Secrets live in Secret Manager. The database password (from Neon) and the
+pseudonym secret (generated) go there straight from Terraform, so they never
+pass through a person, but they are in the Terraform state, which is kept in
+a private Cloud Storage bucket.
+
+Setting it up once, with `gcloud`, `terraform`, a Neon API key and a Vercel
+token:
+
+```bash
+gcloud projects create <project-id> && gcloud billing projects link <project-id> --billing-account=<id>
+gcloud storage buckets create gs://<project-id>-tfstate --location=europe-west1 \
+  --uniform-bucket-level-access --public-access-prevention
+gcloud storage buckets update gs://<project-id>-tfstate --versioning
+gcloud auth application-default login
+
+cd infra && cp terraform.tfvars.example terraform.tfvars   # fill it in
+export NEON_API_KEY=... VERCEL_API_TOKEN=...
+terraform init -backend-config="bucket=<project-id>-tfstate"
+terraform apply
+```
 
 ## API
 
