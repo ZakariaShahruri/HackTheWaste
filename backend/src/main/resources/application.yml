@@ -62,3 +62,4 @@ leuvengo:
     pseudonym-secret: ${PSEUDONYM_SECRET:dev-only-pseudonym-secret}
   ml:
     api-url: ${ML_API_URL:http://localhost:8000}
+    google-id-token: ${ML_GOOGLE_ID_TOKEN:false}

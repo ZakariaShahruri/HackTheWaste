@@ -1,6 +1,7 @@
 package be.leuven.leuvengo.service;
 
 import be.leuven.leuvengo.config.LeuvenGoProperties;
+import be.leuven.leuvengo.net.GoogleIdTokens;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +32,7 @@ public class PredictionService {
     private static final GeoBox GRID_AREA = new GeoBox(50.855, 50.905, 4.670, 4.730);
 
     private final String mlApiUrl;
+    private final Optional<GoogleIdTokens> idTokens;
     private final JsonMapper mapper;
     /**
      * HTTP/1.1 on purpose: over plain http the JDK client otherwise tries an
@@ -41,8 +43,9 @@ public class PredictionService {
             .connectTimeout(Duration.ofSeconds(2))
             .build();
 
-    public PredictionService(LeuvenGoProperties props, JsonMapper mapper) {
+    public PredictionService(LeuvenGoProperties props, GoogleIdTokens idTokens, JsonMapper mapper) {
         this.mlApiUrl = props.ml().apiUrl();
+        this.idTokens = props.ml().googleIdToken() ? Optional.of(idTokens) : Optional.empty();
         this.mapper = mapper;
     }
 
@@ -66,14 +69,16 @@ public class PredictionService {
                     "lng_max", GRID_AREA.lngMax(),
                     "lat_steps", steps,
                     "lng_steps", steps));
-            HttpRequest request = HttpRequest.newBuilder()
+            HttpRequest.Builder request = HttpRequest.newBuilder()
                     .uri(URI.create(mlApiUrl + "/predict/grid"))
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body))
-                    .timeout(Duration.ofSeconds(10))
-                    .build();
+                    .timeout(Duration.ofSeconds(10));
+            if (idTokens.isPresent()) {
+                request.header("Authorization", "Bearer " + idTokens.get().forAudience(mlApiUrl));
+            }
 
-            HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+            HttpResponse<String> response = http.send(request.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
                 log.warn("ML service returned HTTP {}", response.statusCode());
                 return Optional.empty();

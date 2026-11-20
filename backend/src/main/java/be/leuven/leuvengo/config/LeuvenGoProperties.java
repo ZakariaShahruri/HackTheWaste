@@ -70,7 +70,10 @@ public record LeuvenGoProperties(
             @DefaultValue("") String azureConnectionString,
             @DefaultValue("trash-photos") String azureContainer) {}
 
-    public record Ml(@DefaultValue("http://localhost:8000") String apiUrl) {}
+    public record Ml(
+            @DefaultValue("http://localhost:8000") String apiUrl,
+            /** Send a Google ID token: the ML service is a private Cloud Run service. */
+            @DefaultValue("false") boolean googleIdToken) {}
 
     public record Security(
             /** How long a login stays valid. */

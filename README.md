@@ -174,6 +174,7 @@ The backend reads environment variables (see `backend/.env.example`):
 | `ALLOWED_ORIGINS`                 | prod         | Comma-separated frontend origins for CORS                     |
 | `PSEUDONYM_SECRET`                | prod         | HMAC key for sender pseudonyms; keep it stable                |
 | `ML_API_URL`                      | optional     | ML service, default `http://localhost:8000`                   |
+| `ML_GOOGLE_ID_TOKEN`              | Cloud Run    | `true` sends a Google ID token, for a private ML service      |
 | `GEMINI_API_KEY`, `GEMINI_MODEL`  | optional     | Photo scoring                                                 |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | WhatsApp | Media downloads and webhook signatures                     |
 | `TWILIO_WEBHOOK_URL`              | WhatsApp     | The exact webhook URL configured in Twilio                    |
