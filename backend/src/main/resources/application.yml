@@ -1,5 +1,10 @@
 server:
   port: ${PORT:8080}
+  # Tomcat reads X-Forwarded-For from the right and stops at the first address
+  # that isn't a private-range proxy, so the client address is the one Cloud Run
+  # saw. Spring's "framework" strategy trusts the leftmost entry, which the
+  # client writes itself, and that let anyone dodge the rate limits.
+  forward-headers-strategy: native
 
 spring:
   application:

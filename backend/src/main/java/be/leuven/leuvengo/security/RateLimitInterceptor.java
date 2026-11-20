@@ -27,7 +27,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
         RateLimited limit = method.getMethodAnnotation(RateLimited.class);
         if (limit == null) return true;
 
-        // getRemoteAddr honours X-Forwarded-For when server.forward-headers-strategy is set (prod).
+        // The real client address, even behind a proxy (see server.forward-headers-strategy).
         String key = limit.value() + ":" + request.getRemoteAddr();
         RateLimiter.Decision decision =
                 limiter.tryAcquire(key, limit.requests(), Duration.ofSeconds(limit.perSeconds()));

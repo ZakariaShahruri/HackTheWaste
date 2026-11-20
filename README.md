@@ -96,7 +96,8 @@ flowchart LR
 - **Sessions.** Passwords are BCrypt-hashed. Session tokens are stored only as
   SHA-256 hashes and expire after 7 days. Completing work orders requires the
   crew role.
-- **Rate limits** on login, sign-up and browser uploads.
+- **Rate limits** on login, sign-up and browser uploads, keyed on the address
+  the hosting proxy saw, so a forged `X-Forwarded-For` doesn't reset them.
 - **Fail fast in production.** The prod profile refuses to start without
   `ALLOWED_ORIGINS` and `PSEUDONYM_SECRET`.
 
