@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -9,9 +9,11 @@ on:
 permissions:
   contents: read
 
+# Superseded pull request runs are cancelled; runs on main queue instead, so
+# a deploy is never cut off halfway.
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   backend:
@@ -120,3 +122,62 @@ jobs:
         run: docker compose logs
       - if: always()
         run: docker compose down -v
+
+  # Deploys only from main, only when every check above passed, and only once
+  # infra/ has been applied and its outputs saved as repository variables.
+  deploy-backend:
+    name: Deploy API and ML service (Cloud Run)
+    needs: [backend, frontend, ml, infra, containers]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.GCP_PROJECT_ID != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      REGION: ${{ vars.GCP_REGION }}
+      API_IMAGE: ${{ vars.GCP_REGISTRY }}/api:${{ github.sha }}
+      ML_IMAGE: ${{ vars.GCP_REGISTRY }}/ml:${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOYER }}
+      - uses: google-github-actions/setup-gcloud@v3
+      - run: gcloud auth configure-docker "$REGION-docker.pkg.dev" --quiet
+      - name: Build and push the images
+        run: |
+          docker build -t "$ML_IMAGE" ml
+          docker build -t "$API_IMAGE" backend
+          docker push "$ML_IMAGE"
+          docker push "$API_IMAGE"
+      # Cloud Run only moves traffic to a revision once its startup probe
+      # passes, so a broken image fails the job and the old one keeps serving.
+      - name: Roll out, ML service first
+        run: |
+          gcloud run deploy leuven-go-ml --image "$ML_IMAGE" --region "$REGION" --quiet
+          gcloud run deploy leuven-go-api --image "$API_IMAGE" --region "$REGION" --quiet
+      - name: Smoke test the live API
+        run: scripts/smoke.sh "$(gcloud run services describe leuven-go-api --region "$REGION" --format 'value(status.url)')"
+
+  deploy-frontend:
+    name: Deploy frontend (Vercel)
+    needs: deploy-backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    env:
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --global vercel@66.1.0
+      - run: vercel pull --yes --environment=production
+      - run: vercel build --prod
+      - run: vercel deploy --prebuilt --prod

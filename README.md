@@ -1,6 +1,6 @@
 # Leuven Go
 
-[![CI](https://github.com/ZakariaShahruri/HackTheWaste/actions/workflows/ci.yml/badge.svg)](https://github.com/ZakariaShahruri/HackTheWaste/actions/workflows/ci.yml)
+[![CI/CD](https://github.com/ZakariaShahruri/HackTheWaste/actions/workflows/ci.yml/badge.svg)](https://github.com/ZakariaShahruri/HackTheWaste/actions/workflows/ci.yml)
 
 **Cleanliness, gamified.** Residents send one photo and a location pin over
 WhatsApp. An AI rates how dirty the spot is, nearby reports merge into a single
@@ -228,6 +228,27 @@ terraform init -backend-config="bucket=<project-id>-tfstate"
 terraform apply
 ```
 
+Then save the `github_variables` output as repository variables
+(`gh variable set`) and a Vercel token as the `VERCEL_TOKEN` secret of a
+`production` environment. From then on, every push to `main` that passes all
+of CI is deployed by the same workflow:
+
+```
+tests, terraform checks, compose smoke test
+  → build the images and push them to Artifact Registry
+  → roll out the ML service, then the API (Cloud Run)
+  → smoke-test the live API
+  → build and publish the frontend (Vercel)
+```
+
+GitHub signs in to Google with its own short-lived OIDC token through
+Workload Identity Federation, so no Google key is stored anywhere. Only this
+repository's `main` branch is trusted, and the deploy account can push images
+and roll out the two services, nothing else. Cloud Run moves traffic to a new
+revision only after its health check passes, so a broken build never replaces
+a working one. Terraform is applied by hand: CI only checks it, so it never
+holds the broad permissions infrastructure changes need.
+
 ## API
 
 | Method | Path                                | Purpose                                          |
@@ -266,9 +287,11 @@ cd ml       && pip install -r requirements-dev.txt && pytest
 The backend suite includes a test that boots the app on a real Postgres in
 Docker (Testcontainers), so the Flyway migrations and entity mappings are
 checked against the production database. It is skipped when Docker isn't
-running. GitHub Actions runs all three suites on every push, then builds the
-images, starts the compose stack and runs `scripts/smoke.sh` against it. The
-same script checks a deployed backend: `scripts/smoke.sh https://<backend-url>`.
+running. GitHub Actions runs all three suites on every push, checks the
+Terraform (`fmt`, `validate`, tflint) and tests the budget kill switch, then
+builds the images, starts the compose stack and runs `scripts/smoke.sh`
+against it. The same script checks a deployed backend:
+`scripts/smoke.sh https://<backend-url>`.
 
 ## Limitations
 
