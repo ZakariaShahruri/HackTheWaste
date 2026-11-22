@@ -36,11 +36,15 @@ locals {
 resource "google_service_account" "api" {
   account_id   = "leuven-go-api"
   display_name = "Leuven Go API (runtime)"
+
+  depends_on = [google_project_service.enabled]
 }
 
 resource "google_service_account" "ml" {
   account_id   = "leuven-go-ml"
   display_name = "Leuven Go ML service (runtime)"
+
+  depends_on = [google_project_service.enabled]
 }
 
 resource "google_cloud_run_v2_service" "ml" {

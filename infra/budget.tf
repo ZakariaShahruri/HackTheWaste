@@ -40,6 +40,8 @@ resource "google_service_account" "kill_switch" {
   display_name = "Unlinks billing when the budget is exceeded"
 }
 
+  depends_on = [google_project_service.enabled]
+
 resource "google_project_iam_member" "kill_switch_unlinks_billing" {
   project = var.project_id
   role    = "roles/billing.projectManager"

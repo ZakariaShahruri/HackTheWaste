@@ -27,6 +27,8 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 resource "google_service_account" "deployer" {
   account_id   = "github-deployer"
   display_name = "GitHub Actions deployer"
+
+  depends_on = [google_project_service.enabled]
 }
 
 resource "google_service_account_iam_member" "deployer_from_github" {
