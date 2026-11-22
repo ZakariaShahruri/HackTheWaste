@@ -11,6 +11,7 @@ resource "vercel_project_domain" "frontend" {
   domain     = var.frontend_domain
 }
 
+# Build-time values that end up in the public bundle, so none are secret.
 resource "vercel_project_environment_variables" "frontend" {
   project_id = vercel_project.frontend.id
   variables = [
@@ -19,6 +20,6 @@ resource "vercel_project_environment_variables" "frontend" {
       VITE_WHATSAPP_NUMBER    = var.whatsapp_number
       VITE_WHATSAPP_JOIN_CODE = var.whatsapp_join_code
       SITE_URL                = "https://${var.frontend_domain}"
-    } : { key = key, value = value, target = ["production"] } if value != ""
+    } : { key = key, value = value, target = ["production"], sensitive = false } if value != ""
   ]
 }
