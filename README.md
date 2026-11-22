@@ -217,6 +217,8 @@ token:
 
 ```bash
 gcloud projects create <project-id> && gcloud billing projects link <project-id> --billing-account=<id>
+# Terraform needs these two to read the project and enable everything else.
+gcloud services enable cloudresourcemanager.googleapis.com serviceusage.googleapis.com --project=<project-id>
 gcloud storage buckets create gs://<project-id>-tfstate --location=europe-west1 \
   --uniform-bucket-level-access --public-access-prevention
 gcloud storage buckets update gs://<project-id>-tfstate --versioning
