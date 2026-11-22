@@ -9,6 +9,7 @@ resource "google_pubsub_topic" "budget" {
 }
 
 resource "google_billing_budget" "monthly" {
+  provider        = google.billing
   billing_account = var.billing_account_id
   display_name    = "leuven-go monthly"
 
@@ -38,9 +39,9 @@ resource "google_billing_budget" "monthly" {
 resource "google_service_account" "kill_switch" {
   account_id   = "billing-kill-switch"
   display_name = "Unlinks billing when the budget is exceeded"
-}
 
   depends_on = [google_project_service.enabled]
+}
 
 resource "google_project_iam_member" "kill_switch_unlinks_billing" {
   project = var.project_id

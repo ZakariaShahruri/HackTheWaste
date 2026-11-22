@@ -33,7 +33,14 @@ terraform {
 provider "google" {
   project = var.project_id
   region  = var.region
-  # Billing budgets are checked against this project's quota, not a default one.
+}
+
+# The budgets API bills its quota to the caller's project, so it needs one
+# named. Only the budget uses this: Eventarc rejects functions created with it.
+provider "google" {
+  alias                 = "billing"
+  project               = var.project_id
+  region                = var.region
   billing_project       = var.project_id
   user_project_override = true
 }
