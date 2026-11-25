@@ -40,7 +40,7 @@ export function WhatsAppReportCTA({ variant, message, className }: Props) {
     >
       {button}
       <div style={{ background: "white", padding: 10, borderRadius: 12 }}>
-        <QRCodeSVG value={href} size={qrSize} />
+        <QRCodeSVG value={href} size={qrSize} title="QR code that opens our WhatsApp chat" />
       </div>
       {variant === "full" && WHATSAPP_JOIN_CODE && (
         <span className="tag tag-info" style={{ textAlign: "center" }}>
