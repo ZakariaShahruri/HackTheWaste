@@ -57,7 +57,7 @@ class WhatsAppBotIT {
     /** Regression: WhatsApp used to store a filthy photo as a "clean" report and vice versa. */
     @Test
     void aFilthyPhotoBecomesADirtyReport() {
-        assertThat(location(ANA)).isEqualTo(WhatsAppBot.ASK_FOR_PHOTO);
+        assertThat(location(ANA)).isEqualTo(BotReplies.ASK_FOR_PHOTO);
         String reply = photo(ANA);
 
         assertThat(reply).contains("10/100", "Overflowing bin", "#plastic");
@@ -83,7 +83,7 @@ class WhatsAppBotIT {
         location(ANA);
         when(media.fetch(anyString())).thenReturn(new SafeHttpFetcher.Download("<svg/>".getBytes(), "image/jpeg"));
 
-        assertThat(photo(ANA)).isEqualTo(WhatsAppBot.BAD_MEDIA);
+        assertThat(photo(ANA)).isEqualTo(BotReplies.BAD_MEDIA);
         assertThat(reports.count()).isEqualTo(reportsBefore);
     }
 
@@ -100,7 +100,7 @@ class WhatsAppBotIT {
     void aPhotoNeverUsesSomeoneElsesLocation() {
         location(ANA);
 
-        assertThat(photo(BOB)).isEqualTo(WhatsAppBot.NEED_LOCATION);
+        assertThat(photo(BOB)).isEqualTo(BotReplies.NEED_LOCATION);
         assertThat(reports.count()).isEqualTo(reportsBefore);
         assertThat(photo(ANA)).contains("10/100");
     }
@@ -110,7 +110,7 @@ class WhatsAppBotIT {
         location(ANA);
         pending.findAll().getFirst().moveTo(LAT, LNG, Instant.now().minus(WhatsAppSessions.TTL).minusSeconds(1));
 
-        assertThat(photo(ANA)).isEqualTo(WhatsAppBot.NEED_LOCATION);
+        assertThat(photo(ANA)).isEqualTo(BotReplies.NEED_LOCATION);
     }
 
     @Test
@@ -127,7 +127,7 @@ class WhatsAppBotIT {
     @Test
     void aPinOutsideLeuvenIsRefusedStraightAway() {
         assertThat(bot.handle(new WhatsAppBot.Inbound(ANA, null, null, 51.2194, 4.4025, null)))
-                .isEqualTo(WhatsAppBot.OUTSIDE_LEUVEN);
+                .isEqualTo(BotReplies.OUTSIDE_LEUVEN);
         assertThat(pending.count()).isZero();
     }
 
@@ -145,7 +145,7 @@ class WhatsAppBotIT {
         location(ANA);
         when(media.fetch(anyString())).thenThrow(new SafeHttpFetcher.FetchException("Content type not allowed"));
 
-        assertThat(photo(ANA)).isEqualTo(WhatsAppBot.BAD_MEDIA);
+        assertThat(photo(ANA)).isEqualTo(BotReplies.BAD_MEDIA);
         assertThat(pending.count()).isEqualTo(1);
         assertThat(reports.count()).isEqualTo(reportsBefore);
     }
@@ -223,25 +223,25 @@ class WhatsAppBotIT {
 
     @Test
     void aCodeOnItsOwnMeansNothingWithoutTheList() {
-        assertThat(text(ANA, "PED")).isEqualTo(WhatsAppBot.WELCOME);
+        assertThat(text(ANA, "PED")).startsWith("Hi Ana! 👋 Welcome to Leuven Go.");
 
         text(BOB, "clan");
-        assertThat(text(ANA, "PED")).isEqualTo(WhatsAppBot.WELCOME);
+        assertThat(text(ANA, "PED")).startsWith("Hi Ana! 👋 Welcome to Leuven Go.");
     }
 
     @Test
     void theListIsForgottenOnceTheyJoinSendAPinOrWaitTooLong() {
         text(ANA, "clan EKO");
-        assertThat(text(ANA, "PED")).isEqualTo(WhatsAppBot.WELCOME);
+        assertThat(text(ANA, "PED")).startsWith("Hi Ana! 👋 Welcome to Leuven Go.");
 
         text(ANA, "clan");
         location(ANA);
-        assertThat(text(ANA, "PED")).isEqualTo(WhatsAppBot.WELCOME);
+        assertThat(text(ANA, "PED")).startsWith("Hi Ana! 👋 Welcome to Leuven Go.");
 
         text(ANA, "clan");
         senders.findBySenderKey(pseudonyms.senderKey(ANA)).orElseThrow()
                 .startChoosing(Instant.now().minus(ClanMembership.CHOICE_TTL).minusSeconds(1));
-        assertThat(text(ANA, "PED")).isEqualTo(WhatsAppBot.WELCOME);
+        assertThat(text(ANA, "PED")).startsWith("Hi Ana! 👋 Welcome to Leuven Go.");
     }
 
     @Test
@@ -263,8 +263,55 @@ class WhatsAppBotIT {
 
     @Test
     void otherTextGetsTheWelcome() {
-        assertThat(text(ANA, "hello")).isEqualTo(WhatsAppBot.WELCOME);
-        assertThat(text(ANA, "clans are cool")).isEqualTo(WhatsAppBot.WELCOME);
+        assertThat(text(ANA, "hello")).startsWith("Hi Ana! 👋 Welcome to Leuven Go.");
+        assertThat(text(ANA, "clans are cool")).startsWith("Hi Ana! 👋 Welcome to Leuven Go.");
+    }
+
+    @Test
+    void theWelcomeDependsOnWhereTheSenderIs() {
+        assertThat(text(ANA, "hello")).contains("To report litter", "Reply *clan* to pick");
+
+        text(ANA, "clan UCL");
+        location(ANA);
+        assertThat(text(ANA, "hello"))
+                .contains("We still have the 📍 pin you sent", "You're reporting for 🎓 UCLL")
+                .doesNotContain("To report litter");
+    }
+
+    /** The text the website's WhatsApp button starts with. */
+    @Test
+    void aGreetingIsNeverTakenForAClan() {
+        text(ANA, "clan");
+
+        assertThat(text(ANA, "Hi! I'd like to report litter in Leuven.")).startsWith("Hi Ana!");
+        assertThat(text(ANA, "UCL")).startsWith("Hi Ana!");
+    }
+
+    @Test
+    void theMenuListsEverything() {
+        for (String command : List.of("menu", "Menu ", "help")) {
+            assertThat(text(ANA, command)).isEqualTo(BotReplies.MENU);
+        }
+    }
+
+    @Test
+    void resetDropsThePinAndTheClanList() {
+        for (String command : List.of("reset", "Cancel")) {
+            location(ANA);
+            text(ANA, "clan");
+
+            assertThat(text(ANA, command)).isEqualTo(BotReplies.RESET);
+            assertThat(photo(ANA)).isEqualTo(BotReplies.NEED_LOCATION);
+            assertThat(text(ANA, "UCL")).startsWith("Hi Ana!");
+        }
+        assertThat(text(ANA, "reset")).isEqualTo(BotReplies.NOTHING_TO_RESET);
+    }
+
+    @Test
+    void resetLeavesOtherSendersAlone() {
+        location(BOB);
+        text(ANA, "reset");
+        assertThat(photo(BOB)).contains("10/100");
     }
 
     private String named(String profileName) {

@@ -84,6 +84,9 @@ flowchart LR
 | a photo (after a pin)| the AI's score, its assessment and what it spotted         |
 | `clan`               | your current clan and the list of clans; reply with a code or a name to join |
 | `clan CODE`          | joins that clan straight away, e.g. `clan APO`            |
+| `reset`              | drops the pin you sent (so does `cancel`)                 |
+| `menu`               | lists all of this (so does `help`)                        |
+| anything else        | a greeting with the next step, e.g. that your pin is still waiting for its photo |
 
 Replies are sent through Twilio's API rather than in the webhook response:
 Twilio stops waiting for a response after 15 seconds, which waking up from zero

@@ -1,13 +1,10 @@
 package be.leuven.leuvengo.whatsapp;
 
-import be.leuven.leuvengo.domain.CleanlinessScale;
 import be.leuven.leuvengo.domain.Faculty;
 import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.net.SafeHttpFetcher;
 import be.leuven.leuvengo.security.Pseudonyms;
-import be.leuven.leuvengo.service.GeminiService;
 import be.leuven.leuvengo.service.LeuvenArea;
-import be.leuven.leuvengo.service.PointsPolicy;
 import be.leuven.leuvengo.service.ReportIngestionService;
 import be.leuven.leuvengo.service.ReportIngestionService.Filed;
 import be.leuven.leuvengo.service.ReportIngestionService.Rejected;
@@ -16,10 +13,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * The WhatsApp conversation, independent of Twilio's HTTP details:
@@ -55,23 +52,13 @@ public class WhatsAppBot {
         Optional<String> firstName() {
             if (profileName == null) return Optional.empty();
             String first = profileName.replaceAll("[\\p{Cntrl}*_~`]", " ").strip().split("\\s+")[0];
-            return first.isEmpty() ? Optional.empty() : Optional.of(shorten(first));
+            return first.isEmpty() ? Optional.empty() : Optional.of(first);
         }
     }
 
-    static final String WELCOME = "Hi! Send a 📍 location pin to start a cleanliness report.\n\n"
-            + "Reply \"clan\" to pick the faculty your reports earn points for.";
-    static final String NEED_LOCATION = "We don't have a location yet. Please share a 📍 location pin first, "
-            + "then send the photo again.";
-    static final String ASK_FOR_PHOTO = "Got it! 📍 Now please send a photo of the litter "
-            + "so our AI can assess it.";
-    static final String OUTSIDE_LEUVEN = "That location is outside Leuven. Leuven Go only covers the city of "
-            + "Leuven, so please share a 📍 pin from there.";
-    static final String BAD_MEDIA = "We couldn't open that photo. Please send it again as a normal photo.";
-    static final String SERVER_ERROR = "Something went wrong on our side. Please send the photo again in a moment.";
-    /** How much of someone's own words we repeat back to them. */
-    private static final int MAX_ECHO = 30;
     private static final Pattern CLAN_COMMAND = Pattern.compile("(?is)clan\\b[\\s:]*(.*)");
+    /** Also what the website's WhatsApp button sends, so it never counts as picking a clan. */
+    private static final Pattern GREETING = Pattern.compile("(?is)(hi|hey|hello|hallo|hoi)\\b.*");
 
     private final WhatsAppSessions sessions;
     private final Pseudonyms pseudonyms;
@@ -91,41 +78,59 @@ public class WhatsAppBot {
     /** Handles one message and returns the text to reply with. */
     public String handle(Inbound message) {
         if (message.from() == null || message.from().isBlank()) {
-            return WELCOME;
+            return BotReplies.MENU;
         }
         String senderKey = pseudonyms.senderKey(message.from());
         String publicId = pseudonyms.publicId(message.from());
 
         if (message.hasLocation()) {
             log.info("WhatsApp location from {}", publicId);
-            if (!LeuvenArea.contains(message.lat(), message.lng())) {
-                return OUTSIDE_LEUVEN;
-            }
-            clans.stopChoosing(senderKey);
-            sessions.start(senderKey, message.lat(), message.lng());
-            return ASK_FOR_PHOTO;
+            return handleLocation(senderKey, message.lat(), message.lng());
         }
         if (message.hasMedia()) {
             log.info("WhatsApp photo from {}", publicId);
             return handlePhoto(senderKey, publicId, message.mediaUrl());
         }
+        return handleText(senderKey, message.text(), message.firstName());
+    }
 
-        String text = message.text();
+    private String handleText(String senderKey, String text, Optional<String> firstName) {
+        switch (text.toLowerCase(Locale.ROOT)) {
+            // Twilio can keep "help" and "cancel" to itself, so the bot only advertises the other two.
+            case "menu", "help" -> {
+                return BotReplies.MENU;
+            }
+            case "reset", "cancel" -> {
+                return reset(senderKey);
+            }
+            default -> { }
+        }
         Matcher clanCommand = CLAN_COMMAND.matcher(text);
         if (clanCommand.matches()) {
             String choice = clanCommand.group(1);
-            return choice.isEmpty() ? listClans(senderKey) : joinClan(senderKey, choice, message.firstName());
+            return choice.isEmpty() ? listClans(senderKey) : joinClan(senderKey, choice, firstName);
         }
-        if (!text.isEmpty() && clans.isChoosing(senderKey)) {
-            return joinClan(senderKey, text, message.firstName());
+        if (GREETING.matcher(text).matches()) {
+            clans.stopChoosing(senderKey);
+        } else if (!text.isEmpty() && clans.isChoosing(senderKey)) {
+            return joinClan(senderKey, text, firstName);
         }
-        return WELCOME;
+        return BotReplies.welcome(firstName, sessions.current(senderKey).isPresent(), clans.clanOf(senderKey));
+    }
+
+    private String handleLocation(String senderKey, double lat, double lng) {
+        if (!LeuvenArea.contains(lat, lng)) {
+            return BotReplies.OUTSIDE_LEUVEN;
+        }
+        clans.stopChoosing(senderKey);
+        sessions.start(senderKey, lat, lng);
+        return BotReplies.ASK_FOR_PHOTO;
     }
 
     private String handlePhoto(String senderKey, String publicId, String mediaUrl) {
         Optional<WhatsAppSessions.Location> location = sessions.current(senderKey);
         if (location.isEmpty()) {
-            return NEED_LOCATION;
+            return BotReplies.NEED_LOCATION;
         }
 
         byte[] image;
@@ -133,7 +138,7 @@ public class WhatsAppBot {
             image = media.fetch(mediaUrl).bytes();
         } catch (SafeHttpFetcher.FetchException e) {
             log.warn("Refused WhatsApp media from {}: {}", publicId, e.getMessage());
-            return BAD_MEDIA;
+            return BotReplies.BAD_MEDIA;
         }
 
         String clan = clans.clanOf(senderKey).map(Faculty::getShortCode).orElse(null);
@@ -144,88 +149,40 @@ public class WhatsAppBot {
                     Reporter.anonymous(publicId, clan)));
         } catch (RuntimeException e) {
             log.error("Could not file WhatsApp report from {}", publicId, e);
-            return SERVER_ERROR;
+            return BotReplies.SERVER_ERROR;
         }
 
         return switch (outcome) {
             case Filed filed -> {
                 sessions.finish(senderKey);
-                yield verdict(filed.verdict());
+                yield BotReplies.verdict(filed.verdict());
             }
             case Rejected rejected -> switch (rejected.reason()) {
-                case UNREADABLE_IMAGE -> BAD_MEDIA;
-                case NOT_GENUINE -> rejection(rejected.detail());
-                case OUTSIDE_LEUVEN -> OUTSIDE_LEUVEN;
+                case UNREADABLE_IMAGE -> BotReplies.BAD_MEDIA;
+                case NOT_GENUINE -> BotReplies.rejected(rejected.detail());
+                case OUTSIDE_LEUVEN -> BotReplies.OUTSIDE_LEUVEN;
             };
         };
     }
 
     private String joinClan(String senderKey, String choice, Optional<String> firstName) {
-        return clans.join(senderKey, choice)
-                .map(clan -> joined(clans.standing(clan), firstName))
-                .orElseGet(() -> "There's no clan called \"" + shorten(choice) + "\".\n\n" + listClans(senderKey));
+        Optional<Faculty> joined = clans.join(senderKey, choice);
+        if (joined.isEmpty()) {
+            clans.startChoosing(senderKey);
+            return BotReplies.noSuchClan(choice, clans.all());
+        }
+        return BotReplies.joined(clans.standing(joined.get()), firstName);
     }
 
     private String listClans(String senderKey) {
         clans.startChoosing(senderKey);
-        String current = clans.clanOf(senderKey)
-                .map(f -> "Your clan: " + badge(f) + "\n\n")
-                .orElse("");
-        String options = clans.all().stream()
-                .map(f -> f.getShortCode() + " " + badge(f))
-                .collect(Collectors.joining("\n"));
-        return current + "Reply with a code or a name to join a clan:\n" + options;
+        return BotReplies.clanList(clans.clanOf(senderKey), clans.all());
     }
 
-    private static String joined(ClanMembership.Standing standing, Optional<String> firstName) {
-        Faculty clan = standing.clan();
-        return "Welcome to " + badge(clan) + firstName.map(n -> ", " + n).orElse("") + "!\n\n"
-                + clan.getName() + " is #" + standing.rank() + " with " + standing.points() + " points. "
-                + "Each report you send earns them " + PointsPolicy.MIN + " to " + PointsPolicy.MAX + " points.\n\n"
-                + "Share a 📍 location pin to send one.";
-    }
-
-    private static String badge(Faculty clan) {
-        return clan.getEmoji() + " " + clan.getName();
-    }
-
-    private static String shorten(String text) {
-        return text.length() <= MAX_ECHO ? text : text.substring(0, MAX_ECHO) + "…";
-    }
-
-    private static String rejection(String reason) {
-        return "🚫 Photo rejected\n\n"
-                + "Our AI doesn't think this is a genuine on-site photo: "
-                + (reason != null ? reason : "it doesn't look like a real photo taken on location") + ".\n\n"
-                + "Please take a real photo of the litter where you're standing and send it again.";
-    }
-
-    static String verdict(GeminiService.ScoreResult ai) {
-        StringBuilder sb = new StringBuilder();
-        if (!ai.aiAvailable()) {
-            sb.append("📝 Report received!\n\n");
-            sb.append("Our AI inspector is offline right now, so your report was logged with a neutral score.\n");
-        } else {
-            int score = ai.score();
-            String emoji = switch (CleanlinessScale.toRating(score)) {
-                case 4, 5 -> "🟢";
-                case 3 -> "🟡";
-                case 2 -> "🟠";
-                default -> "🔴";
-            };
-            sb.append("🤖 AI analysis complete!\n\n");
-            sb.append("Cleanliness score: ").append(score).append("/100 (")
-                    .append(CleanlinessScale.label(score)).append(") ").append(emoji).append('\n');
-            if (ai.description() != null) {
-                sb.append("Assessment: ").append(ai.description()).append('\n');
-            }
-            if (!ai.tags().isEmpty()) {
-                sb.append("Spotted: ")
-                        .append(ai.tags().stream().map(t -> "#" + t).collect(Collectors.joining(" ")))
-                        .append('\n');
-            }
-        }
-        sb.append("\nYour report is live on the Leuven Go map. Thanks for keeping Leuven clean! 🌿");
-        return sb.toString();
+    private String reset(String senderKey) {
+        boolean pinWaiting = sessions.current(senderKey).isPresent();
+        clans.stopChoosing(senderKey);
+        sessions.finish(senderKey);
+        return pinWaiting ? BotReplies.RESET : BotReplies.NOTHING_TO_RESET;
     }
 }
