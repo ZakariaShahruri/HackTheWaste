@@ -73,7 +73,8 @@ final class BotReplies {
                 + "Please take a real photo of the litter where you're standing and send it again.";
     }
 
-    static String verdict(GeminiService.ScoreResult ai) {
+    /** @param clan where the sender's clan stands now that it got the points for this report */
+    static String reported(GeminiService.ScoreResult ai, Optional<ClanMembership.Standing> clan, String siteUrl) {
         StringBuilder sb = new StringBuilder();
         if (!ai.aiAvailable()) {
             sb.append("📝 Report received!\n\n");
@@ -98,7 +99,14 @@ final class BotReplies {
                         .append('\n');
             }
         }
-        sb.append("\nYour report is live on the Leuven Go map. Thanks for keeping Leuven clean! 🌿");
+        sb.append('\n').append(clan
+                .map(s -> "+" + PointsPolicy.pointsFor(ai.score()) + " points for " + badge(s.clan())
+                        + " (now " + s.points() + ", #" + s.rank() + ")")
+                .orElse("Reply *clan* to pick a clan, so your next reports earn points."));
+        sb.append("\n\nYour report is live on the Leuven Go map. Thanks for keeping Leuven clean! 🌿");
+        if (!siteUrl.isEmpty()) {
+            sb.append('\n').append(siteUrl).append("/feed");
+        }
         return sb.toString();
     }
 

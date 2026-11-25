@@ -1,5 +1,6 @@
 package be.leuven.leuvengo.whatsapp;
 
+import be.leuven.leuvengo.config.LeuvenGoProperties;
 import be.leuven.leuvengo.domain.Faculty;
 import be.leuven.leuvengo.domain.Report;
 import be.leuven.leuvengo.net.SafeHttpFetcher;
@@ -65,14 +66,16 @@ public class WhatsAppBot {
     private final TwilioMediaFetcher media;
     private final ReportIngestionService ingestion;
     private final ClanMembership clans;
+    private final String siteUrl;
 
     public WhatsAppBot(WhatsAppSessions sessions, Pseudonyms pseudonyms, TwilioMediaFetcher media,
-                       ReportIngestionService ingestion, ClanMembership clans) {
+                       ReportIngestionService ingestion, ClanMembership clans, LeuvenGoProperties props) {
         this.sessions = sessions;
         this.pseudonyms = pseudonyms;
         this.media = media;
         this.ingestion = ingestion;
         this.clans = clans;
+        this.siteUrl = props.siteUrl();
     }
 
     /** Handles one message and returns the text to reply with. */
@@ -141,12 +144,12 @@ public class WhatsAppBot {
             return BotReplies.BAD_MEDIA;
         }
 
-        String clan = clans.clanOf(senderKey).map(Faculty::getShortCode).orElse(null);
+        Optional<Faculty> clan = clans.clanOf(senderKey);
         ReportIngestionService.Outcome outcome;
         try {
             outcome = ingestion.ingest(new ReportIngestionService.PhotoReport(
                     location.get().lat(), location.get().lng(), image, Report.Source.WHATSAPP,
-                    Reporter.anonymous(publicId, clan)));
+                    Reporter.anonymous(publicId, clan.map(Faculty::getShortCode).orElse(null))));
         } catch (RuntimeException e) {
             log.error("Could not file WhatsApp report from {}", publicId, e);
             return BotReplies.SERVER_ERROR;
@@ -155,7 +158,7 @@ public class WhatsAppBot {
         return switch (outcome) {
             case Filed filed -> {
                 sessions.finish(senderKey);
-                yield BotReplies.verdict(filed.verdict());
+                yield BotReplies.reported(filed.verdict(), clan.map(clans::standing), siteUrl);
             }
             case Rejected rejected -> switch (rejected.reason()) {
                 case UNREADABLE_IMAGE -> BotReplies.BAD_MEDIA;

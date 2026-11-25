@@ -18,6 +18,10 @@ import java.util.List;
 @Validated
 @ConfigurationProperties("leuvengo")
 public record LeuvenGoProperties(
+        /** Public address of the website, for links in WhatsApp replies. Empty = no links. */
+        @DefaultValue("")
+        @Pattern(regexp = "(https?://\\S*[^/\\s])?", message = "must be a URL without a trailing slash")
+        String siteUrl,
         @Valid @DefaultValue Traffic traffic,
         @Valid @DefaultValue Cors cors,
         @Valid @DefaultValue Gemini gemini,

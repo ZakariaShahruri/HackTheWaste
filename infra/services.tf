@@ -14,6 +14,7 @@ locals {
       SPRING_DATASOURCE_URL      = local.jdbc_url
       SPRING_DATASOURCE_USERNAME = neon_project.db.database_user
       ALLOWED_ORIGINS            = "https://${var.frontend_domain}"
+      SITE_URL                   = "https://${var.frontend_domain}"
       ML_API_URL                 = google_cloud_run_v2_service.ml.uri
       ML_GOOGLE_ID_TOKEN         = "true"
       LEUVENGO_DEMO_ENABLED      = "true"

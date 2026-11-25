@@ -81,7 +81,7 @@ flowchart LR
 | Send                 | Reply                                                     |
 | -------------------- | --------------------------------------------------------- |
 | a location pin       | asks for a photo of the spot (valid for 30 minutes)       |
-| a photo (after a pin)| the AI's score, its assessment and what it spotted         |
+| a photo (after a pin)| the AI's score, its assessment, what it spotted and the points your clan earned |
 | `clan`               | your current clan and the list of clans; reply with a code or a name to join |
 | `clan CODE`          | joins that clan straight away, e.g. `clan APO`            |
 | `reset`              | drops the pin you sent (so does `cancel`)                 |
@@ -191,6 +191,7 @@ The backend reads environment variables (see `backend/.env.example`):
 | `GEMINI_API_KEY`, `GEMINI_MODEL`  | optional     | Photo scoring                                                 |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | WhatsApp | Replies, media downloads and webhook signatures            |
 | `TWILIO_WEBHOOK_URL`              | WhatsApp     | The exact webhook URL configured in Twilio                    |
+| `SITE_URL`                        | optional     | The website's URL, for the feed link in WhatsApp replies      |
 | `AZURE_STORAGE_CONNECTION_STRING`, `AZURE_STORAGE_CONTAINER` | optional | Store photos in Azure Blob instead of the database |
 | `LEUVENGO_DEMO_ENABLED`           | optional     | Default `true`: seed a week of demo reports and the crew login |
 | `LEUVENGO_DEMO_RESET_CRON`        | optional     | When the demo resets, default `0 0 4 * * *`; `-` disables it  |

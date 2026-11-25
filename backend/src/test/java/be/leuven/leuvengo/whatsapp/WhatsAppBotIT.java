@@ -26,7 +26,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
-@SpringBootTest
+@SpringBootTest(properties = "leuvengo.site-url=https://leuvengo.example")
 @Transactional
 class WhatsAppBotIT {
 
@@ -184,9 +184,22 @@ class WhatsAppBotIT {
     }
 
     @Test
+    void theReplyShowsWhatTheReportEarned() {
+        faculties.findAll().forEach(f -> f.setPoints(0));
+        faculties.findByShortCode("EKO").orElseThrow().setPoints(500);
+        faculties.findByShortCode("UCL").orElseThrow().setPoints(400);
+        text(ANA, "clan UCL");
+        location(ANA);
+
+        assertThat(photo(ANA))
+                .contains("+55 points for 🎓 UCLL (now 455, #2)")
+                .endsWith("https://leuvengo.example/feed");
+    }
+
+    @Test
     void reportsWithoutAClanCreditNobody() {
         location(BOB);
-        photo(BOB);
+        assertThat(photo(BOB)).contains("Reply *clan* to pick a clan").doesNotContain(" points for ");
         assertThat(latestReport().getCreditedFaculty()).isNull();
     }
 

@@ -39,6 +39,7 @@ management:
         include: health
 
 leuvengo:
+  site-url: ${SITE_URL:}
   traffic:
     # meters - reports within this radius are merged into the same hotspot
     cluster-radius-m: 40
