@@ -23,6 +23,14 @@ describe("ClanPills", () => {
     expect(onSelect).toHaveBeenLastCalledWith(undefined);
   });
 
+  it("holds the space with placeholders until the clans have loaded", () => {
+    const { container, rerender } = render(<ClanPills label="Clan" faculties={null} onSelect={vi.fn()} />);
+    expect(container.querySelectorAll(".clan-pill-skeleton").length).toBeGreaterThan(0);
+
+    rerender(<ClanPills label="Clan" faculties={[]} onSelect={vi.fn()} />);
+    expect(container.querySelector(".clan-pill-skeleton")).toBeNull();
+  });
+
   it("offers a pill that clears the filter", async () => {
     const onSelect = vi.fn();
     render(<ClanPills label="Filter" faculties={faculties} selected="VTK" onSelect={onSelect} noneLabel="All clans" />);

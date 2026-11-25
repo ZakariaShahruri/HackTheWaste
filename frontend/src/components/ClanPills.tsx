@@ -1,8 +1,13 @@
 import type { FacultyDto } from "../api/types";
 import { readableText } from "../lib/colors";
+import { Skeleton } from "./States";
+
+// Roughly how many clans there are, so the pills don't push the page down when they arrive.
+const PLACEHOLDERS = 21;
 
 interface Props {
-  faculties: FacultyDto[];
+  /** Null while they load. */
+  faculties: FacultyDto[] | null;
   selected?: string;
   /** Called with the clan's code, or undefined when the selected clan is clicked again. */
   onSelect: (shortCode: string | undefined) => void;
@@ -25,7 +30,8 @@ export function ClanPills({ faculties, selected, onSelect, noneLabel, label }: P
           {noneLabel}
         </button>
       )}
-      {faculties.map((f) => {
+      {faculties === null && <Skeleton count={PLACEHOLDERS} className="clan-pill-skeleton" />}
+      {faculties?.map((f) => {
         const active = selected === f.shortCode;
         return (
           <button

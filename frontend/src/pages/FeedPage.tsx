@@ -27,7 +27,7 @@ export default function FeedPage() {
 
       <ClanPills
         label="Filter by clan"
-        faculties={faculties.data ?? []}
+        faculties={faculties.error ? [] : faculties.data}
         selected={clan}
         onSelect={setClan}
         noneLabel="All clans"

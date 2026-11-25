@@ -10,7 +10,7 @@ import { ClanPills } from "../components/ClanPills";
 export default function SignupPage() {
   const { register, loading } = useAuth();
   const navigate = useNavigate();
-  const { data: faculties } = useApi((signal) => api.faculties(signal));
+  const { data: faculties, error: facultiesError } = useApi((signal) => api.faculties(signal));
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -91,7 +91,7 @@ export default function SignupPage() {
           <div className="field-label">
             Clan <span className="muted">(optional, the faculty your reports score for)</span>
           </div>
-          <ClanPills label="Clan" faculties={faculties ?? []} selected={clan} onSelect={setClan} />
+          <ClanPills label="Clan" faculties={facultiesError ? [] : faculties} selected={clan} onSelect={setClan} />
           {clan && (
             <p className="field-hint">
               Selected: <strong>{faculties?.find((f) => f.shortCode === clan)?.name}</strong>

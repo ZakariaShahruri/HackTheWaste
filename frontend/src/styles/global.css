@@ -1919,6 +1919,12 @@ textarea {
   border: 1px solid var(--clan, var(--border));
 }
 
+.clan-pill-skeleton {
+  width: 62px;
+  height: 30px;
+  border-radius: 8px;
+}
+
 .clan-pill.active {
   background: var(--clan, var(--fg));
   color: var(--clan-ink, white);
