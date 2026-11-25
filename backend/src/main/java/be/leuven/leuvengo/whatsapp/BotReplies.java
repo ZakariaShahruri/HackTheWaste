@@ -4,6 +4,9 @@ import be.leuven.leuvengo.domain.CleanlinessScale;
 import be.leuven.leuvengo.domain.Faculty;
 import be.leuven.leuvengo.service.GeminiService;
 import be.leuven.leuvengo.service.PointsPolicy;
+import be.leuven.leuvengo.whatsapp.WhatsAppSessions.Half;
+import be.leuven.leuvengo.whatsapp.WhatsAppSessions.Photo;
+import be.leuven.leuvengo.whatsapp.WhatsAppSessions.Pin;
 
 import java.util.List;
 import java.util.Optional;
@@ -17,19 +20,19 @@ final class BotReplies {
     static final String MENU = """
             Here's what you can send:
 
-            📍 a location pin, then 📸 a photo: report litter
+            📍 a location pin and 📸 a photo, in any order: report litter
             *clan*: see or change your clan
-            *reset*: drop the pin you sent
+            *reset*: drop the pin or photo you sent
             *menu*: this list""";
-    static final String NEED_LOCATION = "We don't have a location yet. Please share " + SHARE_PIN
-            + " first, then send the photo again.";
+    static final String ASK_FOR_PIN = "Got your photo! 📸 Now please share " + SHARE_PIN
+            + " of where you took it.";
     static final String ASK_FOR_PHOTO = "Got it! 📍 Now please send a photo of the litter "
             + "so our AI can assess it.";
     static final String OUTSIDE_LEUVEN = "That location is outside Leuven. Leuven Go only covers the city of "
             + "Leuven, so please share a 📍 pin from there.";
     static final String BAD_MEDIA = "We couldn't open that photo. Please send it again as a normal photo.";
     static final String SERVER_ERROR = "Something went wrong on our side. Please send the photo again in a moment.";
-    static final String RESET = "Done, we've dropped your pin. Share a new 📍 one whenever you like.";
+    static final String RESET = "Done, we've dropped your unfinished report. Share a new 📍 pin whenever you like.";
     static final String NOTHING_TO_RESET = "There's nothing to drop. Share " + SHARE_PIN + " to start a report.";
 
     /** How much of someone's own words we repeat back to them. */
@@ -37,10 +40,12 @@ final class BotReplies {
 
     private BotReplies() {}
 
-    static String welcome(Optional<String> firstName, boolean pinWaiting, Optional<Faculty> clan) {
-        String steps = pinWaiting
-                ? "We still have the 📍 pin you sent, so just send a 📸 photo of the litter."
-                : "To report litter:\n1. Share " + SHARE_PIN + "\n2. Send a 📸 photo of it";
+    static String welcome(Optional<String> firstName, Optional<Half> waiting, Optional<Faculty> clan) {
+        String steps = switch (waiting.orElse(null)) {
+            case null -> "To report litter:\n1. Share " + SHARE_PIN + "\n2. Send a 📸 photo of it";
+            case Pin pin -> "We still have the 📍 pin you sent, so just send a 📸 photo of the litter.";
+            case Photo photo -> "We still have the 📸 photo you sent, so just share " + SHARE_PIN + ".";
+        };
         String clanLine = clan
                 .map(c -> "You're reporting for " + badge(c) + ".")
                 .orElse("Reply *clan* to pick the clan your reports earn points for.");

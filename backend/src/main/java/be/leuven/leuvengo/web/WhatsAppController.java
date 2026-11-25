@@ -28,6 +28,7 @@ public class WhatsAppController {
             @BindParam("Latitude") Double lat,
             @BindParam("Longitude") Double lng,
             @BindParam("MediaUrl0") String mediaUrl,
+            @BindParam("MediaContentType0") String mediaType,
             @BindParam("ProfileName") String profileName,
             @BindParam("MessageStatus") String messageStatus) {
 
@@ -37,7 +38,7 @@ public class WhatsAppController {
         }
 
         WhatsAppBot.Inbound toInbound() {
-            return new WhatsAppBot.Inbound(from, profileName, body, lat, lng, mediaUrl);
+            return new WhatsAppBot.Inbound(from, profileName, body, lat, lng, mediaUrl, mediaType);
         }
     }
 

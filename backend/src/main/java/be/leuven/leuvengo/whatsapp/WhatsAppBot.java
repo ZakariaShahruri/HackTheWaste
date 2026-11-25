@@ -10,6 +10,9 @@ import be.leuven.leuvengo.service.ReportIngestionService;
 import be.leuven.leuvengo.service.ReportIngestionService.Filed;
 import be.leuven.leuvengo.service.ReportIngestionService.Rejected;
 import be.leuven.leuvengo.service.Reporter;
+import be.leuven.leuvengo.whatsapp.WhatsAppSessions.Half;
+import be.leuven.leuvengo.whatsapp.WhatsAppSessions.Photo;
+import be.leuven.leuvengo.whatsapp.WhatsAppSessions.Pin;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -18,16 +21,17 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * The WhatsApp conversation, independent of Twilio's HTTP details:
- * <ol>
- *   <li>the user shares a location pin, and we remember it for 30 minutes;</li>
- *   <li>the user sends a photo, which goes through {@link ReportIngestionService}, and we reply with the verdict.</li>
- * </ol>
- * Sending {@code clan} lists the faculties; the sender picks one by code or name, and it then earns points for
+ * the user sends a location pin and a photo, in either order. The first is remembered for 30 minutes; the second
+ * completes the report, which goes through {@link ReportIngestionService}, and we reply with the verdict.
+ *
+ * <p>Sending {@code clan} lists the faculties; the sender picks one by code or name, and it then earns points for
  * their reports.
- * Phone numbers are only used to derive pseudonyms; they are never stored or logged.
+ *
+ * <p>Phone numbers are only used to derive pseudonyms; they are never stored or logged.
  */
 @Service
 public class WhatsAppBot {
@@ -35,7 +39,8 @@ public class WhatsAppBot {
     private static final Logger log = LoggerFactory.getLogger(WhatsAppBot.class);
 
     /** One incoming message, as Twilio describes it. Every field may be null. */
-    public record Inbound(String from, String profileName, String body, Double lat, Double lng, String mediaUrl) {
+    public record Inbound(String from, String profileName, String body, Double lat, Double lng,
+                          String mediaUrl, String mediaType) {
 
         boolean hasLocation() {
             return lat != null && lng != null;
@@ -61,6 +66,8 @@ public class WhatsAppBot {
     /** Also what the website's WhatsApp button sends, so it never counts as picking a clan. */
     private static final Pattern GREETING = Pattern.compile("(?is)(hi|hey|hello|hallo|hoi)\\b.*");
 
+    /** One lock per group of senders: a pin and photo sent together must not each miss the other. */
+    private final Object[] locks = Stream.generate(Object::new).limit(64).toArray();
     private final WhatsAppSessions sessions;
     private final Pseudonyms pseudonyms;
     private final TwilioMediaFetcher media;
@@ -84,15 +91,19 @@ public class WhatsAppBot {
             return BotReplies.MENU;
         }
         String senderKey = pseudonyms.senderKey(message.from());
-        String publicId = pseudonyms.publicId(message.from());
+        synchronized (locks[Math.floorMod(senderKey.hashCode(), locks.length)]) {
+            return handle(message, senderKey, pseudonyms.publicId(message.from()));
+        }
+    }
 
+    private String handle(Inbound message, String senderKey, String publicId) {
         if (message.hasLocation()) {
             log.info("WhatsApp location from {}", publicId);
-            return handleLocation(senderKey, message.lat(), message.lng());
+            return handleLocation(senderKey, publicId, new Pin(message.lat(), message.lng()));
         }
         if (message.hasMedia()) {
             log.info("WhatsApp photo from {}", publicId);
-            return handlePhoto(senderKey, publicId, message.mediaUrl());
+            return handlePhoto(senderKey, publicId, message);
         }
         return handleText(senderKey, message.text(), message.firstName());
     }
@@ -118,27 +129,39 @@ public class WhatsAppBot {
         } else if (!text.isEmpty() && clans.isChoosing(senderKey)) {
             return joinClan(senderKey, text, firstName);
         }
-        return BotReplies.welcome(firstName, sessions.current(senderKey).isPresent(), clans.clanOf(senderKey));
+        return BotReplies.welcome(firstName, sessions.current(senderKey), clans.clanOf(senderKey));
     }
 
-    private String handleLocation(String senderKey, double lat, double lng) {
-        if (!LeuvenArea.contains(lat, lng)) {
+    private String handleLocation(String senderKey, String publicId, Pin pin) {
+        if (!LeuvenArea.contains(pin.lat(), pin.lng())) {
             return BotReplies.OUTSIDE_LEUVEN;
         }
         clans.stopChoosing(senderKey);
-        sessions.start(senderKey, lat, lng);
-        return BotReplies.ASK_FOR_PHOTO;
+        Optional<Half> before = sessions.current(senderKey);
+        // Held even when the photo is already there, so a bad photo only needs a new photo.
+        sessions.hold(senderKey, pin);
+        return before.orElse(null) instanceof Photo photo
+                ? file(senderKey, publicId, pin, photo)
+                : BotReplies.ASK_FOR_PHOTO;
     }
 
-    private String handlePhoto(String senderKey, String publicId, String mediaUrl) {
-        Optional<WhatsAppSessions.Location> location = sessions.current(senderKey);
-        if (location.isEmpty()) {
-            return BotReplies.NEED_LOCATION;
+    private String handlePhoto(String senderKey, String publicId, Inbound message) {
+        if (message.mediaType() != null && !TwilioMediaFetcher.IMAGE_TYPES.contains(message.mediaType())) {
+            return BotReplies.BAD_MEDIA;
         }
+        Photo photo = new Photo(message.mediaUrl());
+        if (sessions.current(senderKey).orElse(null) instanceof Pin pin) {
+            return file(senderKey, publicId, pin, photo);
+        }
+        clans.stopChoosing(senderKey);
+        sessions.hold(senderKey, photo);
+        return BotReplies.ASK_FOR_PIN;
+    }
 
+    private String file(String senderKey, String publicId, Pin pin, Photo photo) {
         byte[] image;
         try {
-            image = media.fetch(mediaUrl).bytes();
+            image = media.fetch(photo.mediaUrl()).bytes();
         } catch (SafeHttpFetcher.FetchException e) {
             log.warn("Refused WhatsApp media from {}: {}", publicId, e.getMessage());
             return BotReplies.BAD_MEDIA;
@@ -148,7 +171,7 @@ public class WhatsAppBot {
         ReportIngestionService.Outcome outcome;
         try {
             outcome = ingestion.ingest(new ReportIngestionService.PhotoReport(
-                    location.get().lat(), location.get().lng(), image, Report.Source.WHATSAPP,
+                    pin.lat(), pin.lng(), image, Report.Source.WHATSAPP,
                     Reporter.anonymous(publicId, clan.map(Faculty::getShortCode).orElse(null))));
         } catch (RuntimeException e) {
             log.error("Could not file WhatsApp report from {}", publicId, e);
@@ -183,9 +206,9 @@ public class WhatsAppBot {
     }
 
     private String reset(String senderKey) {
-        boolean pinWaiting = sessions.current(senderKey).isPresent();
+        boolean hadHalf = sessions.current(senderKey).isPresent();
         clans.stopChoosing(senderKey);
         sessions.finish(senderKey);
-        return pinWaiting ? BotReplies.RESET : BotReplies.NOTHING_TO_RESET;
+        return hadHalf ? BotReplies.RESET : BotReplies.NOTHING_TO_RESET;
     }
 }

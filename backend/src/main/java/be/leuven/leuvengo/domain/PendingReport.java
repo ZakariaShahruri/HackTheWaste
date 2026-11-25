@@ -5,9 +5,8 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 /**
- * A WhatsApp report waiting for its photo: the sender has shared a location
- * pin and we expect a photo next. One per sender; deleted once the photo
- * arrives or after it expires.
+ * Half a WhatsApp report: either the location pin or the photo, waiting for the
+ * other. One per sender; deleted once the report is filed or after it expires.
  */
 @Entity
 @Table(name = "pending_report")
@@ -21,33 +20,41 @@ public class PendingReport {
     @Column(nullable = false, unique = true, length = 64)
     private String senderKey;
 
-    @Column(nullable = false)
-    private double lat;
+    private Double lat;
 
-    @Column(nullable = false)
-    private double lng;
+    private Double lng;
+
+    /** Where Twilio keeps the photo; it is only downloaded once there's a pin. */
+    @Column(length = 1024)
+    private String mediaUrl;
 
     @Column(nullable = false)
     private Instant createdAt;
 
     protected PendingReport() {}
 
-    public PendingReport(String senderKey, double lat, double lng, Instant createdAt) {
+    public PendingReport(String senderKey) {
         this.senderKey = senderKey;
-        this.lat = lat;
-        this.lng = lng;
-        this.createdAt = createdAt;
     }
 
     public Long getId() { return id; }
     public String getSenderKey() { return senderKey; }
-    public double getLat() { return lat; }
-    public double getLng() { return lng; }
+    public Double getLat() { return lat; }
+    public Double getLng() { return lng; }
+    public String getMediaUrl() { return mediaUrl; }
     public Instant getCreatedAt() { return createdAt; }
 
-    public void moveTo(double lat, double lng, Instant at) {
+    public void holdPin(double lat, double lng, Instant at) {
         this.lat = lat;
         this.lng = lng;
+        this.mediaUrl = null;
+        this.createdAt = at;
+    }
+
+    public void holdPhoto(String mediaUrl, Instant at) {
+        this.lat = null;
+        this.lng = null;
+        this.mediaUrl = mediaUrl;
         this.createdAt = at;
     }
 }

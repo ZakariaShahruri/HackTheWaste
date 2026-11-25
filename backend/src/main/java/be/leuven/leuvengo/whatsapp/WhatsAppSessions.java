@@ -13,17 +13,23 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
-/** Remembers each sender's location pin until their photo arrives. */
+/** Remembers the half of a report each sender has sent, until the other half arrives. */
 @Service
 public class WhatsAppSessions {
 
-    /** A pin older than this is stale; the user has to share their location again. */
+    /** A pin or photo older than this is stale; the user has to send it again. */
     public static final Duration TTL = Duration.ofMinutes(30);
 
     private static final Logger log = LoggerFactory.getLogger(WhatsAppSessions.class);
 
-    public record Location(double lat, double lng) {}
+    /** What we have from a sender so far. */
+    public sealed interface Half permits Pin, Photo {}
+
+    public record Pin(double lat, double lng) implements Half {}
+
+    public record Photo(String mediaUrl) implements Half {}
 
     private final PendingReportRepository pending;
     private final Clock clock;
@@ -33,22 +39,28 @@ public class WhatsAppSessions {
         this.clock = clock;
     }
 
-    /** Starts (or restarts) a report at this location. */
+    /** Keeps this half, replacing whatever the sender sent before. */
     @Transactional
-    public void start(String senderKey, double lat, double lng) {
+    public void hold(String senderKey, Half half) {
         Instant now = clock.instant();
-        pending.findBySenderKey(senderKey).ifPresentOrElse(
-                p -> p.moveTo(lat, lng, now),
-                () -> pending.save(new PendingReport(senderKey, lat, lng, now)));
+        Consumer<PendingReport> update = switch (half) {
+            case Pin pin -> p -> p.holdPin(pin.lat(), pin.lng(), now);
+            case Photo photo -> p -> p.holdPhoto(photo.mediaUrl(), now);
+        };
+        PendingReport report = pending.findBySenderKey(senderKey).orElseGet(() -> new PendingReport(senderKey));
+        update.accept(report);
+        pending.save(report);
     }
 
-    /** The sender's own live pin, if any. Never another sender's. */
+    /** The sender's own live half, if any. Never another sender's. */
     @Transactional(readOnly = true)
-    public Optional<Location> current(String senderKey) {
+    public Optional<Half> current(String senderKey) {
         Instant cutoff = clock.instant().minus(TTL);
         return pending.findBySenderKey(senderKey)
                 .filter(p -> p.getCreatedAt().isAfter(cutoff))
-                .map(p -> new Location(p.getLat(), p.getLng()));
+                .map(p -> p.getMediaUrl() != null
+                        ? new Photo(p.getMediaUrl())
+                        : new Pin(p.getLat(), p.getLng()));
     }
 
     @Transactional

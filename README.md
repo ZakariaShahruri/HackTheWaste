@@ -38,7 +38,7 @@ flowchart LR
     ML[ML service<br/>FastAPI] -->|litter likelihood| PRED[Predictive heatmap]
 ```
 
-1. **Report.** Over WhatsApp you send a location pin, then a photo. Without
+1. **Report.** Over WhatsApp you send a location pin and a photo, in either order. Without
    WhatsApp, the report page's "In your browser" tab takes the same photo and
    a spot (your location or a tap on the map) and posts them to
    `POST /api/demo-reports`, which runs the exact same pipeline. The browser
@@ -80,13 +80,13 @@ flowchart LR
 
 | Send                 | Reply                                                     |
 | -------------------- | --------------------------------------------------------- |
-| a location pin       | asks for a photo of the spot (valid for 30 minutes)       |
-| a photo (after a pin)| the AI's score, its assessment, what it spotted and the points your clan earned |
+| a pin or a photo     | asks for the other one (the first is kept for 30 minutes) |
+| the other one        | the AI's score, its assessment, what it spotted and the points your clan earned |
 | `clan`               | your current clan and the list of clans; reply with a code or a name to join |
 | `clan CODE`          | joins that clan straight away, e.g. `clan APO`            |
-| `reset`              | drops the pin you sent (so does `cancel`)                 |
+| `reset`              | drops an unfinished report (so does `cancel`)             |
 | `menu`               | lists all of this (so does `help`)                        |
-| anything else        | a greeting with the next step, e.g. that your pin is still waiting for its photo |
+| anything else        | a greeting with the next step, e.g. that your pin still needs a photo |
 
 Replies are sent through Twilio's API rather than in the webhook response:
 Twilio stops waiting for a response after 15 seconds, which waking up from zero

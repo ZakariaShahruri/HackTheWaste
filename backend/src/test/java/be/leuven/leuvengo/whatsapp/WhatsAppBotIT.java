@@ -100,7 +100,7 @@ class WhatsAppBotIT {
     void aPhotoNeverUsesSomeoneElsesLocation() {
         location(ANA);
 
-        assertThat(photo(BOB)).isEqualTo(BotReplies.NEED_LOCATION);
+        assertThat(photo(BOB)).isEqualTo(BotReplies.ASK_FOR_PIN);
         assertThat(reports.count()).isEqualTo(reportsBefore);
         assertThat(photo(ANA)).contains("10/100");
     }
@@ -108,16 +108,16 @@ class WhatsAppBotIT {
     @Test
     void aStaleLocationHasToBeSharedAgain() {
         location(ANA);
-        pending.findAll().getFirst().moveTo(LAT, LNG, Instant.now().minus(WhatsAppSessions.TTL).minusSeconds(1));
+        pending.findAll().getFirst().holdPin(LAT, LNG, Instant.now().minus(WhatsAppSessions.TTL).minusSeconds(1));
 
-        assertThat(photo(ANA)).isEqualTo(BotReplies.NEED_LOCATION);
+        assertThat(photo(ANA)).isEqualTo(BotReplies.ASK_FOR_PIN);
     }
 
     @Test
     void expiredLocationsArePurged() {
         location(ANA);
         location(BOB);
-        pending.findAll().getFirst().moveTo(LAT, LNG, Instant.now().minus(WhatsAppSessions.TTL).minusSeconds(1));
+        pending.findAll().getFirst().holdPin(LAT, LNG, Instant.now().minus(WhatsAppSessions.TTL).minusSeconds(1));
 
         sessions.purgeExpired();
 
@@ -126,7 +126,7 @@ class WhatsAppBotIT {
 
     @Test
     void aPinOutsideLeuvenIsRefusedStraightAway() {
-        assertThat(bot.handle(new WhatsAppBot.Inbound(ANA, null, null, 51.2194, 4.4025, null)))
+        assertThat(bot.handle(new WhatsAppBot.Inbound(ANA, null, null, 51.2194, 4.4025, null, null)))
                 .isEqualTo(BotReplies.OUTSIDE_LEUVEN);
         assertThat(pending.count()).isZero();
     }
@@ -134,10 +134,10 @@ class WhatsAppBotIT {
     @Test
     void aNewPinReplacesTheOldOne() {
         location(ANA);
-        bot.handle(new WhatsAppBot.Inbound(ANA, null, null, 50.88, 4.70, null));
+        bot.handle(new WhatsAppBot.Inbound(ANA, null, null, 50.88, 4.70, null, null));
 
         assertThat(pending.count()).isEqualTo(1);
-        assertThat(sessions.current(pseudonyms.senderKey(ANA)).orElseThrow().lat()).isEqualTo(50.88);
+        assertThat(sessions.current(pseudonyms.senderKey(ANA))).contains(new WhatsAppSessions.Pin(50.88, 4.70));
     }
 
     @Test
@@ -167,6 +167,69 @@ class WhatsAppBotIT {
 
         assertThat(photo(ANA)).contains("offline").doesNotContain("/100");
         assertThat(latestReport().getCleanlinessScore()).isEqualTo(50);
+    }
+
+    @Test
+    void aPhotoSentFirstIsFiledWhenThePinArrives() {
+        assertThat(photo(ANA)).isEqualTo(BotReplies.ASK_FOR_PIN);
+        assertThat(reports.count()).isEqualTo(reportsBefore);
+
+        assertThat(location(ANA)).contains("10/100", "Overflowing bin");
+        assertThat(reports.count()).isEqualTo(reportsBefore + 1);
+        assertThat(pending.count()).isZero();
+    }
+
+    @Test
+    void aPhotoSentFirstStaysWithItsSender() {
+        photo(ANA);
+
+        assertThat(location(BOB)).isEqualTo(BotReplies.ASK_FOR_PHOTO);
+        assertThat(reports.count()).isEqualTo(reportsBefore);
+    }
+
+    @Test
+    void aPinOutsideLeuvenKeepsTheWaitingPhoto() {
+        photo(ANA);
+
+        assertThat(bot.handle(new WhatsAppBot.Inbound(ANA, null, null, 51.2194, 4.4025, null, null)))
+                .isEqualTo(BotReplies.OUTSIDE_LEUVEN);
+        assertThat(location(ANA)).contains("10/100");
+    }
+
+    @Test
+    void whenTheWaitingPhotoIsFakeOnlyANewPhotoIsNeeded() {
+        photo(ANA);
+        when(gemini.scorePhoto(any(), anyString())).thenReturn(GeminiService.ScoreResult.rejected("Photo of a screen"));
+        assertThat(location(ANA)).contains("Photo rejected");
+
+        when(gemini.scorePhoto(any(), anyString())).thenReturn(
+                GeminiService.ScoreResult.genuine(10, "Overflowing bin", List.of("plastic")));
+        assertThat(photo(ANA)).contains("10/100");
+    }
+
+    @Test
+    void aStalePhotoHasToBeSentAgain() {
+        photo(ANA);
+        pending.findAll().getFirst().holdPhoto("https://api.twilio.com/media/1",
+                Instant.now().minus(WhatsAppSessions.TTL).minusSeconds(1));
+
+        assertThat(location(ANA)).isEqualTo(BotReplies.ASK_FOR_PHOTO);
+    }
+
+    @Test
+    void aVoiceNoteIsNotKeptAsThePhoto() {
+        assertThat(bot.handle(new WhatsAppBot.Inbound(
+                ANA, null, null, null, null, "https://api.twilio.com/media/1", "audio/ogg")))
+                .isEqualTo(BotReplies.BAD_MEDIA);
+        assertThat(pending.count()).isZero();
+    }
+
+    @Test
+    void theWelcomeSaysThePhotoIsStillWaiting() {
+        photo(ANA);
+        assertThat(text(ANA, "hello")).contains("We still have the 📸 photo you sent");
+        assertThat(text(ANA, "reset")).isEqualTo(BotReplies.RESET);
+        assertThat(location(ANA)).isEqualTo(BotReplies.ASK_FOR_PHOTO);
     }
 
     @Test
@@ -314,7 +377,7 @@ class WhatsAppBotIT {
             text(ANA, "clan");
 
             assertThat(text(ANA, command)).isEqualTo(BotReplies.RESET);
-            assertThat(photo(ANA)).isEqualTo(BotReplies.NEED_LOCATION);
+            assertThat(pending.count()).isZero();
             assertThat(text(ANA, "UCL")).startsWith("Hi Ana!");
         }
         assertThat(text(ANA, "reset")).isEqualTo(BotReplies.NOTHING_TO_RESET);
@@ -328,19 +391,19 @@ class WhatsAppBotIT {
     }
 
     private String named(String profileName) {
-        return bot.handle(new WhatsAppBot.Inbound(ANA, profileName, "clan PED", null, null, null));
+        return bot.handle(new WhatsAppBot.Inbound(ANA, profileName, "clan PED", null, null, null, null));
     }
 
     private String text(String from, String body) {
-        return bot.handle(new WhatsAppBot.Inbound(from, "Ana Peeters", body, null, null, null));
+        return bot.handle(new WhatsAppBot.Inbound(from, "Ana Peeters", body, null, null, null, null));
     }
 
     private String location(String from) {
-        return bot.handle(new WhatsAppBot.Inbound(from, null, null, LAT, LNG, null));
+        return bot.handle(new WhatsAppBot.Inbound(from, null, null, LAT, LNG, null, null));
     }
 
     private String photo(String from) {
-        return bot.handle(new WhatsAppBot.Inbound(from, null, null, null, null, "https://api.twilio.com/media/1"));
+        return bot.handle(new WhatsAppBot.Inbound(from, null, null, null, null, "https://api.twilio.com/media/1", null));
     }
 
     private Report latestReport() {
