@@ -10,4 +10,6 @@ public interface FacultyRepository extends JpaRepository<Faculty, Long> {
     Optional<Faculty> findByShortCode(String shortCode);
 
     List<Faculty> findAllByOrderByShortCodeAsc();
+
+    long countByPointsGreaterThan(int points);
 }

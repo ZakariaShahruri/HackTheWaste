@@ -64,7 +64,7 @@ flowchart LR
    to the prior as reports age.
 5. **Reward.** Each report earns its clan `10 + (100 - score) / 2` points, from
    10 for a clean street to 60 for a filthy one, so the dirtiest spots are worth
-   the most. Text `clan CODE` to the bot to pick
+   the most. Text `clan` to the bot to pick
    the clan your WhatsApp reports count for. Browser reports from a logged-in
    account also earn the same points for the account itself, which can be spent
    on rewards in the marketplace; each redemption returns a voucher code.
@@ -82,8 +82,8 @@ flowchart LR
 | -------------------- | --------------------------------------------------------- |
 | a location pin       | asks for a photo of the spot (valid for 30 minutes)       |
 | a photo (after a pin)| the AI's score, its assessment and what it spotted         |
-| `clan`               | your current clan and the list of clans                   |
-| `clan CODE`          | joins that clan, e.g. `clan APO`                          |
+| `clan`               | your current clan and the list of clans; reply with a code or a name to join |
+| `clan CODE`          | joins that clan straight away, e.g. `clan APO`            |
 
 Replies are sent through Twilio's API rather than in the webhook response:
 Twilio stops waiting for a response after 15 seconds, which waking up from zero
@@ -94,7 +94,8 @@ the response instead.
 
 - **No phone numbers stored.** WhatsApp senders are identified by an
   HMAC-SHA256 of their number with a server-side secret, and numbers never reach
-  the logs. The public feed labels reporters only by channel and rounds
+  the logs. The WhatsApp profile name is used to greet the sender and is
+  never stored or logged. The public feed labels reporters only by channel and rounds
   coordinates to about 10 m.
 - **Webhook signatures.** Every Twilio request is checked against
   `X-Twilio-Signature`, and unsigned requests are rejected.

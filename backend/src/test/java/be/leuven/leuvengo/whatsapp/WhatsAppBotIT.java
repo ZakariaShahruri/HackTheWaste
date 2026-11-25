@@ -5,6 +5,7 @@ import be.leuven.leuvengo.net.SafeHttpFetcher;
 import be.leuven.leuvengo.repository.FacultyRepository;
 import be.leuven.leuvengo.repository.PendingReportRepository;
 import be.leuven.leuvengo.repository.ReportRepository;
+import be.leuven.leuvengo.repository.WhatsAppSenderRepository;
 import be.leuven.leuvengo.support.TestImages;
 import be.leuven.leuvengo.security.Pseudonyms;
 import be.leuven.leuvengo.service.GeminiService;
@@ -39,6 +40,7 @@ class WhatsAppBotIT {
     @Autowired ReportRepository reports;
     @Autowired Pseudonyms pseudonyms;
     @Autowired FacultyRepository faculties;
+    @Autowired WhatsAppSenderRepository senders;
     @MockitoBean GeminiService gemini;
     @MockitoBean TwilioMediaFetcher media;
 
@@ -124,7 +126,7 @@ class WhatsAppBotIT {
 
     @Test
     void aPinOutsideLeuvenIsRefusedStraightAway() {
-        assertThat(bot.handle(new WhatsAppBot.Inbound(ANA, null, 51.2194, 4.4025, null)))
+        assertThat(bot.handle(new WhatsAppBot.Inbound(ANA, null, null, 51.2194, 4.4025, null)))
                 .isEqualTo(WhatsAppBot.OUTSIDE_LEUVEN);
         assertThat(pending.count()).isZero();
     }
@@ -132,7 +134,7 @@ class WhatsAppBotIT {
     @Test
     void aNewPinReplacesTheOldOne() {
         location(ANA);
-        bot.handle(new WhatsAppBot.Inbound(ANA, null, 50.88, 4.70, null));
+        bot.handle(new WhatsAppBot.Inbound(ANA, null, null, 50.88, 4.70, null));
 
         assertThat(pending.count()).isEqualTo(1);
         assertThat(sessions.current(pseudonyms.senderKey(ANA)).orElseThrow().lat()).isEqualTo(50.88);
@@ -171,7 +173,7 @@ class WhatsAppBotIT {
     void joiningAClanCreditsItForLaterReports() {
         int before = faculties.findByShortCode("EKO").orElseThrow().getPoints();
 
-        assertThat(text(ANA, "  Clan eko ")).contains("now reporting for");
+        assertThat(text(ANA, "  Clan eko ")).startsWith("Welcome to 📊 Ekonomika, Ana!");
         location(ANA);
         photo(ANA);
 
@@ -192,14 +194,71 @@ class WhatsAppBotIT {
     void anUnknownClanListsTheRealOnes() {
         assertThat(text(ANA, "clan NOPE"))
                 .startsWith("There's no clan called \"NOPE\"")
-                .contains("EKO", "Reply \"clan CODE\"");
+                .contains("EKO", "Reply with a code or a name");
         assertThat(text(ANA, "clan")).doesNotContain("no clan called").contains("EKO");
     }
 
     @Test
     void theClanCommandShowsYourCurrentClan() {
         text(ANA, "clan EKO");
-        assertThat(text(ANA, "clan")).contains("Your clan: EKO");
+        assertThat(text(ANA, "clan")).contains("Your clan: 📊 Ekonomika");
+    }
+
+    /** Regression: a bare code or name used to get the generic welcome. */
+    @Test
+    void afterTheListACodeOrANameIsEnough() {
+        for (String pick : List.of("UCL", "UCLL", " ucll ")) {
+            text(ANA, "clan");
+            assertThat(text(ANA, pick)).startsWith("Welcome to 🎓 UCLL, Ana!");
+        }
+    }
+
+    @Test
+    void aWrongPickGetsTheListAgainAndAnotherTry() {
+        text(ANA, "clan");
+
+        assertThat(text(ANA, "UGent")).startsWith("There's no clan called \"UGent\"").contains("PED 🚴 Pedal");
+        assertThat(text(ANA, "PED")).startsWith("Welcome to");
+    }
+
+    @Test
+    void aCodeOnItsOwnMeansNothingWithoutTheList() {
+        assertThat(text(ANA, "PED")).isEqualTo(WhatsAppBot.WELCOME);
+
+        text(BOB, "clan");
+        assertThat(text(ANA, "PED")).isEqualTo(WhatsAppBot.WELCOME);
+    }
+
+    @Test
+    void theListIsForgottenOnceTheyJoinSendAPinOrWaitTooLong() {
+        text(ANA, "clan EKO");
+        assertThat(text(ANA, "PED")).isEqualTo(WhatsAppBot.WELCOME);
+
+        text(ANA, "clan");
+        location(ANA);
+        assertThat(text(ANA, "PED")).isEqualTo(WhatsAppBot.WELCOME);
+
+        text(ANA, "clan");
+        senders.findBySenderKey(pseudonyms.senderKey(ANA)).orElseThrow()
+                .startChoosing(Instant.now().minus(ClanMembership.CHOICE_TTL).minusSeconds(1));
+        assertThat(text(ANA, "PED")).isEqualTo(WhatsAppBot.WELCOME);
+    }
+
+    @Test
+    void joiningShowsTheClansPlaceOnTheLeaderboard() {
+        faculties.findAll().forEach(f -> f.setPoints(0));
+        faculties.findByShortCode("EKO").orElseThrow().setPoints(500);
+        faculties.findByShortCode("PED").orElseThrow().setPoints(412);
+
+        assertThat(text(ANA, "clan PED")).contains("Pedal is #2 with 412 points", "earns them 10 to 60 points");
+    }
+
+    @Test
+    void namesAreCleanedUpAndOptional() {
+        assertThat(named("*Zoë*\n_van_ Dam")).startsWith("Welcome to 🚴 Pedal, Zoë!");
+        assertThat(named("x".repeat(80))).startsWith("Welcome to 🚴 Pedal, " + "x".repeat(30) + "…!");
+        assertThat(named("  ")).startsWith("Welcome to 🚴 Pedal!");
+        assertThat(named(null)).startsWith("Welcome to 🚴 Pedal!");
     }
 
     @Test
@@ -208,16 +267,20 @@ class WhatsAppBotIT {
         assertThat(text(ANA, "clans are cool")).isEqualTo(WhatsAppBot.WELCOME);
     }
 
+    private String named(String profileName) {
+        return bot.handle(new WhatsAppBot.Inbound(ANA, profileName, "clan PED", null, null, null));
+    }
+
     private String text(String from, String body) {
-        return bot.handle(new WhatsAppBot.Inbound(from, body, null, null, null));
+        return bot.handle(new WhatsAppBot.Inbound(from, "Ana Peeters", body, null, null, null));
     }
 
     private String location(String from) {
-        return bot.handle(new WhatsAppBot.Inbound(from, null, LAT, LNG, null));
+        return bot.handle(new WhatsAppBot.Inbound(from, null, null, LAT, LNG, null));
     }
 
     private String photo(String from) {
-        return bot.handle(new WhatsAppBot.Inbound(from, null, null, null, "https://api.twilio.com/media/1"));
+        return bot.handle(new WhatsAppBot.Inbound(from, null, null, null, null, "https://api.twilio.com/media/1"));
     }
 
     private Report latestReport() {

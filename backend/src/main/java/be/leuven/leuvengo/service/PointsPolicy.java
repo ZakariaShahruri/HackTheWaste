@@ -12,6 +12,10 @@ public final class PointsPolicy {
 
     private PointsPolicy() {}
 
+    /** The least and most a single report can earn. */
+    public static final int MIN = pointsFor(CleanlinessScale.MAX_SCORE);
+    public static final int MAX = pointsFor(CleanlinessScale.MIN_SCORE);
+
     public static int pointsFor(int cleanlinessScore) {
         return 10 + (CleanlinessScale.MAX_SCORE - CleanlinessScale.clamp(cleanlinessScore)) / 2;
     }

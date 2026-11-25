@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 
-/** Preferences of a WhatsApp reporter, keyed by pseudonym. Currently just their clan. */
+/** A WhatsApp reporter's clan, keyed by pseudonym. */
 @Entity
 @Table(name = "whatsapp_sender")
 public class WhatsAppSender {
@@ -20,6 +20,9 @@ public class WhatsAppSender {
     @Column(length = 10)
     private String facultyShortCode;
 
+    /** When they were last shown the clan list; null once they picked or moved on. */
+    private Instant choosingSince;
+
     @Column(nullable = false)
     private Instant updatedAt;
 
@@ -31,10 +34,21 @@ public class WhatsAppSender {
 
     public String getSenderKey() { return senderKey; }
     public String getFacultyShortCode() { return facultyShortCode; }
+    public Instant getChoosingSince() { return choosingSince; }
     public Instant getUpdatedAt() { return updatedAt; }
 
     public void joinClan(String facultyShortCode, Instant at) {
         this.facultyShortCode = facultyShortCode;
+        stopChoosing(at);
+    }
+
+    public void startChoosing(Instant at) {
+        this.choosingSince = at;
+        this.updatedAt = at;
+    }
+
+    public void stopChoosing(Instant at) {
+        this.choosingSince = null;
         this.updatedAt = at;
     }
 }
