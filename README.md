@@ -211,7 +211,8 @@ It is built to cost nothing at demo traffic and never to surprise anyone with
 a bill:
 
 - Both Cloud Run services scale to zero and are capped at one instance, so a
-  traffic spike queues instead of scaling. A cold start takes a few seconds.
+  traffic spike queues instead of scaling. A cold start takes 15 seconds or
+  more.
 - The ML service is private: only the API's service account may call it, with
   a Google-signed ID token.
 - A monthly budget (`monthly_budget`, 1 in the billing account's currency)
