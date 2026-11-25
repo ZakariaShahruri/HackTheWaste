@@ -85,6 +85,11 @@ flowchart LR
 | `clan`               | your current clan and the list of clans                   |
 | `clan CODE`          | joins that clan, e.g. `clan APO`                          |
 
+Replies are sent through Twilio's API rather than in the webhook response:
+Twilio stops waiting for a response after 15 seconds, which waking up from zero
+can exceed. Without Twilio credentials (local development) the reply goes in
+the response instead.
+
 ## Security and privacy
 
 - **No phone numbers stored.** WhatsApp senders are identified by an
@@ -180,7 +185,7 @@ The backend reads environment variables (see `backend/.env.example`):
 | `ML_API_URL`                      | optional     | ML service, default `http://localhost:8000`                   |
 | `ML_GOOGLE_ID_TOKEN`              | Cloud Run    | `true` sends a Google ID token, for a private ML service      |
 | `GEMINI_API_KEY`, `GEMINI_MODEL`  | optional     | Photo scoring                                                 |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | WhatsApp | Media downloads and webhook signatures                     |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | WhatsApp | Replies, media downloads and webhook signatures            |
 | `TWILIO_WEBHOOK_URL`              | WhatsApp     | The exact webhook URL configured in Twilio                    |
 | `AZURE_STORAGE_CONNECTION_STRING`, `AZURE_STORAGE_CONTAINER` | optional | Store photos in Azure Blob instead of the database |
 | `LEUVENGO_DEMO_ENABLED`           | optional     | Default `true`: seed a week of demo reports and the crew login |
