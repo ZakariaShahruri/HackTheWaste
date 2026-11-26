@@ -11,8 +11,8 @@ Built in 24 hours by team ReCode for a KU Leuven hackathon, which it won, and
 since then hardened into something that runs for real.
 
 **Live demo: [leuvengo.zakariashahruri.com](https://leuvengo.zakariashahruri.com).**
-The backend sleeps when nobody is using it, so the first page load can be slow
-while it wakes up.
+The backend sleeps when nobody is using it, so the first page load takes about
+20 seconds while it wakes up. The site shows a notice while it waits.
 
 It has two views over the same data:
 

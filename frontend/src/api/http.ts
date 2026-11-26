@@ -1,4 +1,5 @@
 import { readStoredUser } from "../lib/authStorage";
+import { trackRead } from "./slowReads";
 
 const API_ORIGIN = import.meta.env.VITE_API_BASE_URL ?? "";
 const BASE = API_ORIGIN + "/api";
@@ -54,6 +55,16 @@ export interface RequestOptions {
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  // Only reads are timed: a photo report is slow on its own while the AI scores it.
+  const settled = (options.method ?? "GET") === "GET" ? trackRead() : undefined;
+  try {
+    return await send<T>(path, options);
+  } finally {
+    settled?.();
+  }
+}
+
+async function send<T>(path: string, options: RequestOptions): Promise<T> {
   const headers = new Headers();
   let body = options.body;
   if (options.json !== undefined) {

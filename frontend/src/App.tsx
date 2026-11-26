@@ -6,6 +6,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Skeleton } from "./components/States";
 import { WhatsAppFloatingButton } from "./components/WhatsAppFloatingButton";
+import { ServerWakeNotice } from "./components/ServerWakeNotice";
 
 // Every page but the landing page loads on demand, so a first visit doesn't
 // download Leaflet and the dashboards.
@@ -42,6 +43,7 @@ export default function App() {
       <div className={`app-shell ${themeClass}`}>
         <TopBar />
         {!HIDE_FLOATING_WHATSAPP.includes(path) && <WhatsAppFloatingButton />}
+        <ServerWakeNotice />
         <main style={{ flex: 1 }}>
           <Suspense fallback={pageLoading}>
             <Routes>

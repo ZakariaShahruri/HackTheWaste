@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, SERVER_UNREACHABLE, errorMessage, isApiError, request, setUnauthorizedListener } from "./http";
 import { writeStoredUser } from "../lib/authStorage";
+import { SLOW_READ_MS, hasSlowReads } from "./slowReads";
+
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((res) => (resolve = res));
+  return { promise, resolve };
+}
 
 function jsonResponse(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -21,6 +28,25 @@ describe("request", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     setUnauthorizedListener(null);
+  });
+
+  it("times reads but not writes, and stops timing once they settle", async () => {
+    vi.useFakeTimers();
+    try {
+      const reply = deferred();
+      fetchMock.mockImplementation(() => reply.promise.then(() => jsonResponse(200, {})));
+      const read = request("/x");
+      const write = request("/y", { method: "POST" });
+
+      vi.advanceTimersByTime(SLOW_READ_MS);
+      expect(hasSlowReads()).toBe(true);
+
+      reply.resolve();
+      await Promise.all([read, write]);
+      expect(hasSlowReads()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("parses JSON on success", async () => {
