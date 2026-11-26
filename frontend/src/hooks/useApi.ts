@@ -15,7 +15,7 @@ export interface AsyncState<T> {
 export interface UseApiOptions {
   /** Re-runs the loader when this value changes (e.g. a selected filter). */
   key?: unknown;
-  /** Re-runs the loader every N ms while the tab is visible. */
+  /** Re-runs the loader every N ms while the tab is visible and no request is in flight. */
   pollMs?: number;
 }
 
@@ -66,6 +66,8 @@ export function useApi<T>(loader: Loader<T>, options: UseApiOptions = {}): Async
     } catch (e) {
       if (controller.signal.aborted || sequence !== sequenceRef.current) return;
       setSnapshot((prev) => ({ ...prev, key: forKey, error: errorMessage(e) }));
+    } finally {
+      if (controllerRef.current === controller) controllerRef.current = null;
     }
   }, []);
 
@@ -74,7 +76,8 @@ export function useApi<T>(loader: Loader<T>, options: UseApiOptions = {}): Async
     const timer =
       pollMs && pollMs > 0
         ? setInterval(() => {
-            if (document.visibilityState === "visible") void run(key);
+            // A slow request, e.g. while the server wakes up, is left to finish instead of restarted.
+            if (document.visibilityState === "visible" && !controllerRef.current) void run(key);
           }, pollMs)
         : undefined;
     return () => {

@@ -86,8 +86,26 @@ describe("useApi", () => {
     const loader = vi.fn(async () => "x");
     renderHook(() => useApi(loader, { pollMs: 1000 }));
     expect(loader).toHaveBeenCalledTimes(1);
-    await act(async () => vi.advanceTimersByTime(3000));
+    await act(async () => vi.advanceTimersByTimeAsync(3000));
     expect(loader).toHaveBeenCalledTimes(4);
+  });
+
+  it("lets a slow request finish instead of restarting it on every poll", async () => {
+    vi.useFakeTimers();
+    const slow = deferred<string>();
+    const signals: AbortSignal[] = [];
+    const loader = vi.fn((signal: AbortSignal) => {
+      signals.push(signal);
+      return slow.promise;
+    });
+    const { result } = renderHook(() => useApi(loader, { pollMs: 1000 }));
+
+    await act(async () => vi.advanceTimersByTime(3500));
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(signals[0].aborted).toBe(false);
+
+    await act(async () => slow.resolve("late"));
+    expect(result.current.data).toBe("late");
   });
 
   it("refetch re-runs the loader", async () => {
